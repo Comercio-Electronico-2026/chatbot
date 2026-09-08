@@ -143,3 +143,22 @@ flowchart TD
     MuestraDetalle --> PreguntaCierre[Bot: ¿Deseas el contacto o hacer otra consulta?]
     MuestraContacto --> PreguntaCierre
     PreguntaCierre --> FinCiclo([Continúa sesión o usuario finaliza])
+
+---
+
+## 5. Revisión entre Pares (Actividad 4)
+
+### Evaluación Heurística de Grice y Mago de Oz
+A partir de la simulación del recorrido conversacional con la técnica del Mago de Oz y el análisis de las heurísticas conversacionales de Grice, se detectaron puntos de fricción y ambigüedad que requerían ajustes en el diseño:
+
+1. **Ajuste 1 (Máxima de Modo / Claridad):**
+   * *Observación:* En el saludo inicial se pedía texto libre (*"Escribe buscar para comenzar"*), lo cual generaba fallos si el usuario escribía variantes naturales como *"hola"*, *"sí"* o frases largas.
+   * *Cambio aplicado:* Se definieron comandos explícitos (`/buscar`, `/ayuda`) y botones de respuesta rápida para guiar la interacción y evitar entradas ambiguas o errores de tipeo.
+
+2. **Ajuste 2 (Máxima de Cualidad / Cobertura real):**
+   * *Observación:* El bot no contemplaba una respuesta transparente cuando el usuario solicitaba una zona o universidad no cubierta por la plataforma (por ejemplo, Santa Ana o San Miguel).
+   * *Cambio aplicado:* Se incorporó un escenario alternativo donde el bot aclara honestamente la falta de cobertura en ese punto y sugiere de inmediato las universidades disponibles en el sistema (UES, UCA, Santa Tecla).
+
+3. **Ajuste 3 (Máxima de Cantidad y Control de Usuario):**
+   * *Observación:* Al presentar las opciones de alojamiento, si ninguna satisfacía al estudiante, la conversación quedaba en un callejón sin salida forzándolo a reiniciar todo con `/start`.
+   * *Cambio aplicado:* Se añadieron salidas explícitas de control al final de la lista: opciones de paginación (*"Ver más opciones"*) y un acceso rápido para *"Modificar búsqueda"* sin perder la sesión.
