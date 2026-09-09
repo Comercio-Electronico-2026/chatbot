@@ -72,44 +72,42 @@ Se utilizará el nombre del nutriente y el tipo de consulta para generar las res
 
 ```mermaid
 flowchart TD
-    A[/start] --> B[Mostrar bienvenida y menú]
-    B --> C{Seleccionar opción}
+    A["Usuario escribe /start"] --> B["Mostrar bienvenida y menú"]
+    B --> C{"Seleccionar opción"}
 
-    C -->|Comparar nutrientes| D[Solicitar dos nutrientes]
-    D --> E{¿Datos completos y válidos?}
-    E -->|Sí| F[Mostrar comparación]
-    E -->|No| G[Solicitar datos nuevamente]
+    C -->|Comparar nutrientes| D["Solicitar dos nutrientes"]
+    D --> E{"¿Datos completos y válidos?"}
+    E -->|Sí| F["Mostrar comparación"]
+    E -->|No| G["Solicitar datos nuevamente"]
     G --> D
 
-    C -->|Fuentes naturales| H[Solicitar nutriente]
-    H --> I{¿Nutriente reconocido?}
-    I -->|Sí| J[Mostrar fuentes naturales]
-    I -->|No| K[Informar error y solicitar nuevamente]
+    C -->|Fuentes naturales| H["Solicitar nutriente"]
+    H --> I{"¿Nutriente reconocido?"}
+    I -->|Sí| J["Mostrar fuentes naturales"]
+    I -->|No| K["Informar error y solicitar nuevamente"]
     K --> H
 
-    C -->|Agendar asesoría| L[Solicitar datos necesarios]
-    L --> M{¿Datos completos?}
-    M -->|Sí| N[Confirmar solicitud]
+    C -->|Agendar asesoría| L["Solicitar datos necesarios"]
+    L --> M{"¿Datos completos?"}
+    M -->|Sí| N["Confirmar solicitud"]
     M -->|No| L
 
-    C -->|Ayuda| O[Mostrar opciones disponibles]
+    C -->|Ayuda| O["Mostrar opciones disponibles"]
     O --> B
 
-    C -->|Cancelar| P[Cancelar operación]
+    C -->|Cancelar| P["Cancelar operación"]
     P --> B
 
-    C -->|Entrada no válida| Q[Informar opción no reconocida]
+    C -->|Entrada no válida| Q["Informar opción no reconocida"]
     Q --> B
 
-    F --> R{¿Desea otra consulta?}
+    F --> R{"¿Desea otra consulta?"}
     J --> R
     N --> R
 
     R -->|Sí| B
-    R -->|No| S[Despedida]
+    R -->|No| S["Despedida"]
 ```
-
----
 
 ## 4. Diálogo de muestra — Camino feliz
 
