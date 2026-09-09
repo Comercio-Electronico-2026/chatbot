@@ -124,3 +124,32 @@ flowchart TD
     PostAction -->|Ver otra opción| QueryAPI
     PostAction -->|Nueva consulta| Welcome
     PostAction -->|Salir / Finalizar| End([Fin de la sesión])
+
+
+---
+# Revisión B: Camilo Medrano MM22108
+
+**1. Alcance y descubribilidad.**
+* **Veredicto:** Parcial.
+* **Evidencia:** El mensaje de bienvenida explica la función principal, pero carece de delimitación explícita sobre sus límites. Además, si el usuario ignora los botones, no hay indicación visual para descubrir el comando `/help`. Existe una inconsistencia documental grave: el inventario lista `/cancel`, pero el texto usa `/cancelar` y menciona un comando `/menu` inexistente en el inventario.
+* **Mejora:** Unificar la nomenclatura de comandos en todo el documento. Modificar el mensaje inicial a: "Soy WhatPhone. Te ayudo a recomendar, consultar y comparar smartphones según precio y uso. Selecciona una opción abajo o escribe `/help` para ver los comandos disponibles."
+
+**2. Grice en el guion — cantidad, relación, manera.**
+* **Veredicto:** Parcial.
+* **Evidencia:** El bot no viola la cantidad (los datos técnicos mostrados son esenciales para justificar la recomendación), pero falla en la manera por falta de jerarquización. La pregunta de cierre presenta dos acciones posibles en una misma oración ("¿Te gustaría ver otra opción similar o consultar la ficha detallada?"), aumentando innecesariamente la carga cognitiva.
+* **Mejora:** Estructurar la ficha técnica con viñetas priorizando el dato de interés del usuario. Eliminar la pregunta compuesta y ofrecer botones unívocos y directos: `[ Ver detalles completos ]` o `[ Buscar otra opción ]`.
+
+**3. Grice — calidad, y relleno de datos.**
+* **Veredicto:** No resuelto.
+* **Evidencia:** El diseño asume que una "API de teléfonos" abstracta garantiza la calidad de la información. Omite definir la metodología de ranking (cómo el algoritmo determina que un teléfono es "el mejor"), el mercado geográfico de referencia (el precio en USD varía drásticamente por país o proveedor) y la fecha de actualización de los precios.
+* **Mejora:** Especificar una fuente verificable de especificaciones y precios. Definir el mercado geográfico objetivo. Documentar una función de puntuación estandarizada (ej. filtro por precio máximo + orden por métrica de rendimiento) que justifique técnica y lógicamente la recomendación.
+
+**4. Manejo de errores (Guion 2).**
+* **Veredicto:** No resuelto.
+* **Evidencia:** Existen bucles infinitos en `ErrorBudget` y `ErrorUsage`. El diseño ignora por completo las entradas fuera de contexto (ej. pedir características de cámara cuando se espera un número). La rama "No hay coincidencias" destruye el contexto de búsqueda obligando al usuario a reiniciar desde cero.
+* **Mejora:** Implementar un límite de tres intentos; al fallar, el bot debe mostrar: "No pude interpretar el dato. `[ Volver al menú ]` `[ Intentar nuevamente ]`". En "No hay coincidencias", debe mantener el estado y sugerir aproximaciones: "No encontré modelos exactos por $250, pero tengo opciones desde $280. `[Ver opciones]` `[Cambiar presupuesto]`".
+
+**5. Reglas de producto.**
+* **Veredicto:** Parcial.
+* **Evidencia:** Al finalizar el camino feliz, se expulsa al usuario forzándolo a escribir `/start` manualmente para continuar, lo cual degrada la usabilidad. Adicionalmente, el nodo `PostAction` -> `QueryAPI` para "Ver otra opción" está mal diseñado lógicamente: ejecutará los mismos parámetros exactos y la API devolverá el mismo equipo.
+* **Mejora:** Reemplazar la instrucción en texto plano por un botón interactivo `[ Volver al menú principal ]`. Modificar la lógica de "Ver otra opción" para que la consulta a la API excluya explícitamente el modelo recomendado actual y busque el siguiente candidato en el ranking.
