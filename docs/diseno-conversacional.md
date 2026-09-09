@@ -152,3 +152,14 @@ flowchart TD
 ```
 ---
 
+### Ajustes y Correcciones al Documento
+
+* **Sección 1 (Lista de Chequeo):**
+  * **¿Qué tipo de respuesta espero en cada caso?:** Agregar qué ocurre si la búsqueda devuelve varios artículos parecidos (ejemplo: *"El bot muestra una lista de 3 a 5 coincidencias con sus respectivos enlaces para que el usuario elija"*).
+  * **Escenarios alternativos:** Añadir la contingencia de fallo de infraestructura: *"Fallo del servidor/API: El bot notifica un inconveniente temporal de conexión y sugiere intentar nuevamente en un momento"*.
+
+* **Sección 2 (Inventario de Intenciones):**
+  * **Intención `ayuda_menu`:** Incluir explícitamente el enunciado de ejemplo `/help` y definir si se manejará `/help` o `/ayuda` (o ambos como alias).
+
+* **Sección 3 (Diálogo de Muestra):**
+  * **Menú de bienvenida y opciones de cierre:** Asegurar que el bot mencione explícitamente los comandos `/cancelar` y `/help` para mantener coherencia con las intenciones declaradas y los requisitos de la guía.
