@@ -228,8 +228,28 @@ Selecciona un producto para ver sus datos.
 
 ## 6. Cambios derivados de la revisión entre pares
 
-Esta sección se completará después de la revisión entre pares. Se registrarán al menos tres cambios, indicando en cada línea la observación de la cual provino.
+## 1. ¿El mensaje de bienvenida explica en una o dos frases qué hace el bot y qué no? Después del Guion 1, ¿B habría sabido qué más puede pedir sin adivinar (comando de ayuda, botones, ejemplos)?
+**Veredicto:** Parcial.
+**Evidencia:** La bienvenida comunica bien las funciones principales y despliega un menú numerado para guiar al usuario. Pero la respuesta inicial omite decir lo que el bot no hace (por ejemplo, procesar pagos o verificar existencias).
+**Mejora:** Agregar en el saludo inicial lo que el bot no hace para que el usuario lo tenga claro.
 
-- Pendiente: cambio 1 y observación de origen.
-- Pendiente: cambio 2 y observación de origen.
-- Pendiente: cambio 3 y observación de origen.
+## 2. Recorran el diálogo de muestra de A turno a turno. ¿Algún mensaje del bot da de más o de menos? ¿Alguna respuesta no viene a cuento del turno anterior? ¿Hay turnos con más de una pregunta, frases largas o jerga interna («número de orden transaccional» en vez de «número de pedido»)
+**Veredicto:** Resuelto.
+**Evidencia:** El diálogo nos muestra la información del producto (categoría y precio) sin saturar la interfaz con especificaciones técnicas innecesarias. Tambien evita jerga interna, formulando una única pregunta directa por turno, como "¿Deseas abrir este producto en la tienda para continuar la compra?". 
+**Mejora:** Aplicar formato de negritas a los nombres de los productos y montos económicos en los mensajes para mejorar la lectura en dispositivos móviles.
+
+## 3. ¿El bot promete algo que no podría cumplir con las API del inventario, o afirma datos que no puede verificar? Si el usuario ya dio un dato en su primer mensaje, ¿el diagrama evita volver a pedírselo?
+**Veredicto:** Resuelto.
+**Evidencia:** El diseño es claro sobre la procedencia de sus datos; se niega a confirmar niveles de inventario porque la API de WooCommerce de la tienda no proporciona esa métrica. Además, el modelo no exige que el usuario repita búsquedas durante el flujo de una misma intención. 
+**Mejora:** Detallar el comportamiento del sistema ante latencias altas para evitar que el usuario asuma que el catálogo está vacío si la petición demora.
+
+## 4. Para cada una de las cuatro situaciones de fricción: ¿el diagrama de A tiene una rama para ella? ¿La reparación va por niveles y corta a los tres intentos? ¿Hay un punto claro donde se deriva a un humano? ¿Los mensajes de error son útiles («no encontré ese pedido, ¿probamos con otro número?») y no técnicos («Error 404»)?
+**Veredicto:** Parcial.
+**Evidencia:** El diagrama central y la sección de escenarios alternativos logra captar mensajes ambiguos, filtros de categorías erróneos, caídas de la API y formatos no soportados como imágenes. Pero, el esquema carece de un tope máximo de tres intentos fallidos y no contempla un mecanismo de escalamiento para derivar al usuario con un operador humano. 
+**Mejora:** Integrar un control en el diagrama de flujo que cuente los fallos; asi al alcanzar tres errores consecutivos, el sistema debe abortar el flujo actual y proporcionar un enlace directo a soporte humano.
+
+## 5. ¿En cualquier punto de los dos guiones el usuario pudo cancelar, volver atrás o pedir ayuda? ¿Toda acción irreversible (pago, cancelación de pedido) se confirma de forma explícita? ¿Cada intención termina con una respuesta clara y una oferta de continuar?
+**Veredicto:** Resuelto.
+**Evidencia:** La arquitectura del bot garantiza los comandos /ayuda y /cancelar pueden llamarse en cualquier estado para limpiar el contexto y regresar al menú base del flujo. Todo el recorrido termina con una invitación clara a para continuar con la interacción ("¿Necesitas consultar otro producto?"). 
+**Mejora:** Documentar un turno de diálogo adicional que muestre exactamente qué texto devuelve el bot cuando el usuario detona el comando /cancelar a mitad de una búsqueda.
+
