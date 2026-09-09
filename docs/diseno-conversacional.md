@@ -132,3 +132,37 @@ flowchart TD
     OfferMore --> FinalDecision{¿Continuar?}
     FinalDecision -->|Sí| Welcome
     FinalDecision -->|No| Farewell([Bot envía mensaje de despedida y cierre])
+
+```
+---
+# Observaciones - GT22004 - José García
+## 1. REsultado Mago de Oz
+
+| Entrada del Usuario | Intención Real / Contexto | Motivo del Fallo en el Diseño |
+| :--- | :--- | :--- |
+| `celulares(prductos)` | Selección de categoría en catálogo | El flujo asume que al seleccionar categoría se llama a `/products`, pero no define la estructura de respuesta cuando el usuario pide un listado general de una categoría sin un producto específico. |
+| `.` | Carácter suelto / entrada vacía | No existe tratamiento para entradas no alfanuméricas o caracteres huérfanos. |
+| `quiero hablar con el superior` | Entrada fuera de dominio  | Mismo caso de fallback ausente: no existe un mensaje de escape estándar que redirija al menú principal ante intenciones no reconocidas. |
+
+## 2. Respuesta de las 5 preguntas
+
+### 1. Alcance y descubribilidad
+* **Veredicto:** Resuelto.
+* **Evidencia:** El mensaje de bienvenida delimita con claridad en dos frases el alcance exacto del bot (catálogo y pedidos), permitiendo entender la función principal sin confusión.
+* **Mejora:** Complementar el mensaje añadiendo comandos visibles o ejemplos: Escribe /catalogo, /pedido o /ayuda para ver las opciones disponibles.
+### 2. Grice en el guion — cantidad, relación, manera
+* **Veredicto:** Parcial.
+* **Evidencia:** En catálogo da información insuficiente (lista categorías pero no despliega productos al elegir).
+* **Mejora:** Turnos breves con datos directos: *«En Celulares tenemos: 1. Modelo X ($120), 2. Modelo Y ($250). ¿Cuál te interesa?»*
+### 3. Grice — calidad, y relleno de datos
+* **Veredicto:** Parcial.
+* **Evidencia:** Los datos de stock coinciden con la API, pero si el usuario envía el producto desde el primer turno, el diagrama fuerza a navegar las categorías antes de consultar.
+* **Mejora:** Extraer entidad en el primer mensaje y saltar directo a la consulta de la API sin obligar a elegir categoría.
+### 4. Manejo de errores 
+* **Veredicto:** parcial
+* **Evidencia:** No hay ramas para entradas fuera de dominio (generó "diseño no contempla"), pero tiene mensajes de error en pedidos y responde claramente lo que requiere
+* **Mejora:** Crear un nodo global de Fallback: *«No pude entenderte  escribe /inicio para volver al menú.»*
+### 5. Reglas de producto
+* **Veredicto:** Parcial.
+* **Evidencia:** escribir "catálogo" durante la consulta de pedido provocó error de formato y atrapó al usuario en un bucle. pero si cuenta con comandos /cancelar /help
+* **Mejora:** Priorizar la intercepción de /cancelar, /help e intenciones antes de validar formatos, liberando el flujo: «Operación cancelada. ¿Qué deseas consultar ahora?»
