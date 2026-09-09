@@ -124,7 +124,7 @@ flowchart TD
     PostAction -->|Ver otra opción| QueryAPI
     PostAction -->|Nueva consulta| Welcome
     PostAction -->|Salir / Finalizar| End([Fin de la sesión])
-
+```
 
 ---
 # Revisión B: Camilo Medrano MM22108
