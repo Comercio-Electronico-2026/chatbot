@@ -46,34 +46,34 @@ graph TD
 
 ## Notas del Ejercicio (Mago de Oz)
 
-*   **Guion 1 (Camino Feliz):** Todo funcionó perfectamente [cite: 2]. El usuario saludó, pidió evaluar una posición, ingresó los datos correctamente y el bot le dio la respuesta final preguntando si quería seguir [cite: 2]. No hubo ningún problema.
-*   **Guion 2 (Camino con Problemas):** El bot se trabó [cite: 2]. Cuando el usuario se equivocó al escribir (puso "d4" en vez del código completo), el bot le pidió que lo corrigiera [cite: 2]. El problema fue que, cuando el usuario quiso cambiar de tema y dijo "mejor quiero ver aperturas", el bot no entendió y se quedó repitiendo el mismo mensaje de error [cite: 2]. El usuario se quedó atrapado sin poder salir [cite: 2].
+*   **Guion 1 (Camino Feliz):** Todo funcionó perfectamente  . El usuario saludó, pidió evaluar una posición, ingresó los datos correctamente y el bot le dio la respuesta final preguntando si quería seguir  . No hubo ningún problema.
+*   **Guion 2 (Camino con Problemas):** El bot se trabó  . Cuando el usuario se equivocó al escribir (puso "d4" en vez del código completo), el bot le pidió que lo corrigiera  . El problema fue que, cuando el usuario quiso cambiar de tema y dijo "mejor quiero ver aperturas", el bot no entendió y se quedó repitiendo el mismo mensaje de error  . El usuario se quedó atrapado sin poder salir  .
 
 ---
 
 ## Revisión del Diseño (5 Preguntas)
 
 ### 1. ¿Queda claro lo que hace el bot? (Alcance)
-*   **Veredicto:** A medias (Parcial) [cite: 2].
-*   **Lo que vimos:** El bot saluda y dice qué hace muy bien, pero nunca le avisa al usuario que existe un comando `/help` (ayuda) en caso de sentirse perdido [cite: 2].
-*   **Cómo mejorarlo:** Cambiar el saludo inicial para que diga: *"Hola. Puedo evaluar posiciones o darte líneas de apertura. Escribe /help en cualquier momento si necesitas ayuda."* [cite: 2].
+*   **Veredicto:** A medias (Parcial) 
+*   **Lo que vimos:** El bot saluda y dice qué hace muy bien, pero nunca le avisa al usuario que existe un comando `/help` (ayuda) en caso de sentirse perdido 
+*   **Cómo mejorarlo:** Cambiar el saludo inicial para que diga: *"Hola. Puedo evaluar posiciones o darte líneas de apertura. Escribe /help en cualquier momento si necesitas ayuda."* 
 
 ### 2. ¿El bot habla claro y da la información justa? (Claridad)
-*   **Veredicto:** A medias (Parcial) [cite: 2].
-*   **Lo que vimos:** El bot es directo al pedir el código de la posición, pero no da ningún ejemplo de cómo debe verse [cite: 2]. Esto hace que el usuario se pueda equivocar fácilmente de formato [cite: 2].
-*   **Cómo mejorarlo:** Dar un ejemplo visual en el mensaje: *"Envíame el código exacto de la posición (ejemplo: rnbqkbnr/pppp...)."* [cite: 2].
+*   **Veredicto:** A medias (Parcial) 
+*   **Lo que vimos:** El bot es directo al pedir el código de la posición, pero no da ningún ejemplo de cómo debe verse  Esto hace que el usuario se pueda equivocar fácilmente de formato
+*   **Cómo mejorarlo:** Dar un ejemplo visual en el mensaje: *"Envíame el código exacto de la posición (ejemplo: rnbqkbnr/pppp...)."* 
 
 ### 3. ¿El bot dice la verdad y no promete cosas imposibles? (Realismo)
-*   **Veredicto:** Bien (Resuelto) [cite: 2].
-*   **Lo que vimos:** Las respuestas del bot (como dar una ventaja de +0.8) son reales y sí se pueden lograr conectando el bot a Stockfish, tal como planeó el compañero [cite: 2]. No promete cosas mágicas o imposibles [cite: 2].
-*   **Cómo mejorarlo:** No hace falta cambiar nada aquí [cite: 2].
+*   **Veredicto:** Bien (Resuelto) 
+*   **Lo que vimos:** Las respuestas del bot (como dar una ventaja de +0.8) son reales y sí se pueden lograr conectando el bot a Stockfish, tal como planeó el compañero . No promete cosas mágicas o imposibles 
+*   **Cómo mejorarlo:** No hace falta cambiar nada aquí 
 
 ### 4. ¿Qué pasa si el usuario se equivoca? (Manejo de errores)
-*   **Veredicto:** Mal (No resuelto) [cite: 2].
-*   **Lo que vimos:** Si el usuario escribe mal el código varias veces, el bot actúa como disco rayado repitiendo el mismo error [cite: 2]. No cuenta los intentos ni le ofrece otra salida para no frustrarlo [cite: 2].
-*   **Cómo mejorarlo:** El bot debería contar los errores en el diagrama [cite: 2]. Si el usuario falla dos veces, el bot debe decirle: *"El formato sigue mal. ¿Quieres intentar de nuevo o prefieres consultar una apertura?"* [cite: 2].
+*   **Veredicto:** Mal (No resuelto)  .
+*   **Lo que vimos:** Si el usuario escribe mal el código varias veces, el bot actúa como disco rayado repitiendo el mismo error  . No cuenta los intentos ni le ofrece otra salida para no frustrarlo  .
+*   **Cómo mejorarlo:** El bot debería contar los errores en el diagrama  . Si el usuario falla dos veces, el bot debe decirle: *"El formato sigue mal. ¿Quieres intentar de nuevo o prefieres consultar una apertura?"*  .
 
 ### 5. ¿El usuario puede cancelar o pedir ayuda en medio de una acción? (Navegabilidad)
-*   **Veredicto:** Mal (No resuelto) [cite: 2].
-*   **Lo que vimos:** Si el usuario se arrepiente y quiere salir de la opción de evaluar posición, no tiene cómo hacerlo [cite: 2]. Falla porque no hay un comando u opción visible para "cancelar" el proceso a la mitad [cite: 2].
-*   **Cómo mejorarlo:** Agregar en el diagrama una opción para salir en cualquier momento y cambiar el texto: *"Envíame el código de la posición, o escribe /cancelar para volver al inicio."* [cite: 2].
+*   **Veredicto:** Mal (No resuelto)  .
+*   **Lo que vimos:** Si el usuario se arrepiente y quiere salir de la opción de evaluar posición, no tiene cómo hacerlo  . Falla porque no hay un comando u opción visible para "cancelar" el proceso a la mitad  .
+*   **Cómo mejorarlo:** Agregar en el diagrama una opción para salir en cualquier momento y cambiar el texto: *"Envíame el código de la posición, o escribe /cancelar para volver al inicio."*  .
