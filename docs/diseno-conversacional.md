@@ -23,7 +23,7 @@ Resuelve dudas rápidas sobre nutrientes, sus funciones y fuentes naturales. Tam
 
 ### ¿Qué tipo de respuesta se espera?
 - Texto breve.
-- Listas de alimentos.
+- Listas cortas de hasta tres elementos.
 - Comparaciones entre nutrientes.
 - Opciones de selección.
 
@@ -37,21 +37,22 @@ Personas mayores de 18 años, estudiantes, trabajadores o profesionales interesa
 - Solicita ayuda.
 - Cancela la operación.
 - Realiza una consulta médica fuera del alcance del bot.
+- El usuario supera tres intentos con datos inválidos.
 
 ### ¿UI y accesibilidad?
-Se utilizarán mensajes cortos, lenguaje sencillo, listas numeradas y comandos como `/start`, `/ayuda` y `/cancelar`.
+Se utilizarán mensajes cortos, lenguaje sencillo, listas de máximo tres elementos y comandos como `/start`, `/ayuda` y `/cancelar`. También se aceptarán saludos comunes como "Hola" o "Buenas" para mostrar el menú principal.
 
 ### ¿Cómo se validará el prototipo?
-Mediante pruebas con usuarios, solicitándoles comparar nutrientes, consultar fuentes naturales, pedir ayuda y cancelar operaciones.
+Mediante pruebas con usuarios, solicitándoles comparar nutrientes, consultar fuentes naturales, pedir ayuda, cancelar operaciones y probar entradas incorrectas.
 
 ### Pruebas de usabilidad y desempeño
-Se evaluará claridad de los mensajes, facilidad de uso, manejo de errores y tiempo de respuesta.
+Se evaluará claridad de los mensajes, facilidad de uso, manejo de errores, límite de intentos y tiempo de respuesta.
 
 ### ¿Privacidad?
-No se solicitarán datos personales para consultas informativas. Solo se pedirán datos básicos cuando el usuario desee solicitar una asesoría.
+No se solicitarán datos personales para consultas informativas. Solo se pedirán datos básicos cuando el usuario desee solicitar una asesoría. Si el usuario cancela una operación, los datos temporales de esa sesión serán descartados.
 
 ### ¿Qué datos se recolectarán, para qué y cuándo se eliminarán?
-Se utilizará el nombre del nutriente y el tipo de consulta para generar las respuestas. Para una asesoría podrán solicitarse datos básicos de contacto. Los datos que no sean necesarios no se conservarán.
+Se utilizará el nombre del nutriente y el tipo de consulta para generar las respuestas. Para una asesoría podrán solicitarse datos básicos de contacto. Los datos temporales se eliminarán al finalizar o cancelar la sesión cuando ya no sean necesarios.
 
 ---
 
@@ -72,48 +73,62 @@ Se utilizará el nombre del nutriente y el tipo de consulta para generar las res
 
 ```mermaid
 flowchart TD
-    A[/start] --> B[Mostrar bienvenida y menú]
-    B --> C{Seleccionar opción}
+    A{"Inicio de conversación"} -->|"/start"| B["Mostrar bienvenida y menú"]
+    A -->|"Hola / Buenas"| B
+    A -->|"Otro mensaje"| C{"¿Contiene una intención o nutriente válido?"}
 
-    C -->|Comparar nutrientes| D[Solicitar dos nutrientes]
-    D --> E{¿Datos completos y válidos?}
-    E -->|Sí| F[Mostrar comparación]
-    E -->|No| G[Solicitar datos nuevamente]
-    G --> D
+    C -->|Sí| D["Usar los datos ya proporcionados"]
+    C -->|No| B
 
-    C -->|Fuentes naturales| H[Solicitar nutriente]
-    H --> I{¿Nutriente reconocido?}
-    I -->|Sí| J[Mostrar fuentes naturales]
-    I -->|No| K[Informar error y solicitar nuevamente]
-    K --> H
+    B --> E{"Seleccionar opción"}
 
-    C -->|Agendar asesoría| L[Solicitar datos necesarios]
-    L --> M{¿Datos completos?}
-    M -->|Sí| N[Confirmar solicitud]
-    M -->|No| L
+    E -->|"Comparar nutrientes"| F{"¿Ya proporcionó dos nutrientes?"}
+    F -->|Sí| G["Mostrar comparación"]
+    F -->|No| H["Solicitar dato faltante"]
+    H --> I{"¿Dato válido?"}
+    I -->|Sí| G
+    I -->|No| J["Aumentar contador de intentos"]
 
-    C -->|Ayuda| O[Mostrar opciones disponibles]
-    O --> B
+    E -->|"Fuentes naturales"| K{"¿Ya proporcionó el nutriente?"}
+    K -->|Sí| L["Mostrar hasta 3 fuentes naturales"]
+    K -->|No| M["Solicitar nutriente"]
+    M --> N{"¿Nutriente reconocido?"}
+    N -->|Sí| L
+    N -->|No| J
 
-    C -->|Cancelar| P[Cancelar operación]
-    P --> B
+    J --> O{"¿Llegó a 3 intentos?"}
+    O -->|No| P["Reformular con ejemplo y solicitar nuevamente"]
+    P --> E
+    O -->|Sí| Q["Ofrecer ayuda de un profesional"]
+    Q --> R["Ir a Agendar asesoría"]
 
-    C -->|Entrada no válida| Q[Informar opción no reconocida]
-    Q --> B
+    E -->|"Agendar asesoría"| R["Solicitar datos necesarios"]
+    R --> S{"¿Datos completos?"}
+    S -->|Sí| T["Confirmar solicitud"]
+    S -->|No| R
 
-    F --> R{¿Desea otra consulta?}
-    J --> R
-    N --> R
+    E -->|"Ayuda"| U["Mostrar opciones disponibles"]
+    U --> B
 
-    R -->|Sí| B
-    R -->|No| S[Despedida]
+    E -->|"Cancelar"| V["Cancelar operación y eliminar datos temporales"]
+    V --> W["Informar que la operación fue cancelada"]
+    W --> B
+
+    E -->|"Entrada no válida"| J
+
+    G --> X{"¿Desea otra consulta?"}
+    L --> X
+    T --> X
+
+    X -->|Sí| B
+    X -->|No| Y["Despedida"]
 ```
 
 ---
 
 ## 4. Diálogo de muestra — Camino feliz
 
-**Usuario:** /start
+**Usuario:** Hola
 
 **Bot:** ¡Hola! Soy NutriGuía, tu Asesor Virtual de Nutrición Natural. Puedo ayudarte a:
 
@@ -123,19 +138,13 @@ flowchart TD
 
 ¿Qué deseas hacer?
 
-**Usuario:** Consultar fuentes naturales.
-
-**Bot:** Claro. ¿Qué vitamina o nutriente deseas consultar?
-
-**Usuario:** Vitamina B12.
+**Usuario:** Quiero consultar fuentes naturales de vitamina B12.
 
 **Bot:** Algunas fuentes de vitamina B12 son:
 
 1. Pescados.
 2. Carnes.
 3. Huevos.
-4. Leche y productos lácteos.
-5. Alimentos fortificados.
 
 Esta información tiene fines educativos y no sustituye una recomendación profesional.
 
@@ -144,3 +153,23 @@ Esta información tiene fines educativos y no sustituye una recomendación profe
 **Usuario:** No.
 
 **Bot:** Gracias por utilizar NutriGuía.
+
+---
+
+## 5. Cambios realizados tras la revisión entre pares
+
+1. **Se aceptaron saludos comunes como "Hola" o "Buenas" para iniciar la conversación.**  
+   Origen: en el Guion 1 se detectó que el flujo solo aceptaba `/start`.
+
+2. **Se limitaron las listas de fuentes naturales a un máximo de tres elementos por mensaje.**  
+   Origen: observación de Grice sobre cantidad y facilidad de lectura en dispositivos móviles.
+
+3. **Se agregó una validación para reutilizar nutrientes que el usuario ya haya escrito en su mensaje inicial.**  
+   Origen: observación de Grice sobre relleno de datos y evitar preguntas repetidas.
+
+4. **Se agregó un límite de tres intentos para datos inválidos y una derivación a asesoría profesional al tercer fallo.**  
+   Origen: en el Guion 2 se detectó un ciclo infinito al ingresar nutrientes no reconocidos.
+
+5. **Se agregó eliminación de datos temporales al cancelar una operación.**  
+   Origen: observación de reglas de producto y privacidad.
+
