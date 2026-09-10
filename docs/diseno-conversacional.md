@@ -141,10 +141,55 @@ De este guion salen dos datos obligatorios (servicio y fecha), una llamada a la 
 
 ---
 
-## 5. Cambios tras la revisión entre pares (Actividad 4)
+## 5. Revisión entre pares — Actividad 4
 
-*(Completar después del Mago de Oz — agregar aquí al menos tres cambios, uno por línea, indicando de qué observación proviene cada uno.)*
+### 1. Alcance y descubribilidad
 
-- [ ]
-- [ ]
-- [ ]
+**Veredicto:** Resuelto.
+
+**Evidencia:** La bienvenida explica de forma breve las funciones principales del bot: agendar, consultar y cancelar citas. El diagrama incluye un menú principal y las notas establecen que `/ayuda` permite consultar las opciones en cualquier momento. Estos elementos orientan al usuario para comenzar y descubrir las funciones disponibles.
+
+**Mejora concreta:** Mencionar `/ayuda` desde la bienvenida y hacer visibles las funciones complementarias del inventario, como consultar precios, reprogramar y contactar con recepción.
+
+### 2. Grice: cantidad, relación y manera
+
+**Veredicto:** Resuelto.
+
+**Evidencia:** El diálogo sigue una secuencia comprensible: servicio, fecha, horario y confirmación. Los mensajes son breves, hacen una pregunta a la vez y mantienen relación con las respuestas del usuario. El lenguaje es cotidiano y el cierre resume la cita y ofrece continuar.
+
+**Mejora concreta:** Unificar la indicación del formato de fecha entre la lista de chequeo y el diálogo para que el usuario tenga una referencia consistente.
+
+### 3. Grice: calidad y relleno de datos
+
+**Veredicto:** Parcial.
+
+**Evidencia:** Las funciones principales tienen una fuente de información definida en el inventario, como la API de agenda para consultar disponibilidad y reservar. Falta precisar cómo se enviarán los recordatorios y cómo se aprovecharán los datos que el usuario proporcione desde su primer mensaje. La identificación del paciente se menciona en la lista de chequeo, pero todavía no aparece en el flujo.
+
+**Mejora concreta:** Incorporar un paso que compruebe los datos disponibles y solicite únicamente los faltantes, incluyendo la identificación del paciente cuando corresponda. Definir el mecanismo de recordatorios antes de ofrecerlos en la confirmación.
+
+### 4. Manejo de errores
+
+**Veredicto:** Parcial.
+
+**Evidencia:** El documento contempla situaciones frecuentes: fecha sin disponibilidad, número de cita inválido, respuestas fuera de formato y cambio de tema. También ofrece alternativas de horario, reintentos y ayuda. Algunas de estas respuestas están descritas en la lista de chequeo y las notas, pero necesitan completarse en el diagrama. No se especifica todavía el límite de tres intentos ni el momento de derivar a recepción.
+
+**Mejora concreta:** Completar las ramas de error con una secuencia de ayuda: reformular con un ejemplo, ofrecer botones y, al tercer intento fallido, dar la opción de contactar con recepción. Representar también cómo se retoma el proceso después de un cambio de tema.
+
+### 5. Reglas de producto
+
+**Veredicto:** Parcial.
+
+**Evidencia:** Las notas permiten usar `/cancelar` y `/ayuda` en cualquier paso, y el agendamiento termina con una confirmación clara y una oferta de continuar. Falta incluir la opción de volver al paso anterior y aclarar que la cancelación de una cita requiere la autorización del usuario antes de ejecutarse. Los otros flujos pueden aprovechar el mismo cierre del agendamiento.
+
+**Mejora concreta:** Incorporar `/volver`, conectar todas las intenciones con “¿Necesitas algo más?” y agregar una confirmación previa a la cancelación:
+
+> ¿Deseas cancelar tu cita del [fecha] a las [hora]?
+>
+> [Sí, cancelar cita] [No, conservar cita]
+
+### Cambios que deben incorporarse al diseño
+
+1. Mencionar `/ayuda` en la bienvenida y mostrar las funciones complementarias. **Origen:** mejora propuesta en la pregunta 1.
+2. Aprovechar los datos proporcionados por el usuario y solicitar únicamente los faltantes. **Origen:** observación de la pregunta 3.
+3. Completar las ramas de recuperación con ayuda progresiva, límite de tres intentos y contacto con recepción. **Origen:** observación de la pregunta 4.
+4. Agregar `/volver`, confirmación previa a la cancelación y una oferta de continuar en todos los cierres. **Origen:** observación de la pregunta 5.
