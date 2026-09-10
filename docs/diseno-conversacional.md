@@ -130,3 +130,20 @@ flowchart TD
 ```
 
 ---
+
+## 5.Actividad 4 - Revisión entre Pares Evaluado por : PR21064
+**1. Alcance y descubribilidad:** Resuelto.
+* **Evidencia:** El mensaje de bienvenida está claro y ofrece los comandos exactos (`/catalogo`, `/envios`, etc.). Como sugerencia, podrías usar botones interactivos en el futuro en lugar de que el usuario digite completamente el comando.
+
+**2. Grice en el guion (Cantidad, relación, manera):** Parcial.
+* **Evidencia:** Se pide al usuario que escriba "Detalle 12" o "Rascadores", lo cual da pauta a errores humanos. Como sugerencia, es mejor utilizar IDs numéricos (en lugar de "Detalle 12", solo "12") o usar opciones numeradas (1. Rascadores).
+
+**3. Grice — Calidad y APIs:** Resuelto.
+* **Evidencia:** Mapeaste súper bien cada intención con los endpoints reales de la API de WordPress. El bot promete exactamente lo que puede cumplir y no se inventa datos.
+
+**4. Manejo de errores (Guion con fricción):** Parcial.
+* **Evidencia:** En el diagrama de flujo, si alguien mete un ID falso, el bot da error y lo vuelve a pedir (se hace un bucle infinito). Para mejorar esto y cumplir con lo que pide la guía, te sugiero agregar una pequeña condición en el diagrama que corte a los 3 intentos fallidos y le pase al usuario un contacto de soporte humano.
+
+**5. Reglas de producto:** Parcial.
+* **Evidencia:** Aunque en la descripción mencionas que se puede usar `/cancelar` en cualquier momento, en tu diagrama de flujo esa opción solo sale desde el menú principal. Estaría genial que modifiques el diagrama para que se note que el `/cancelar` es una salida global sin importar en qué paso esté trabado el usuario.
+
