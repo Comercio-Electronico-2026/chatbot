@@ -129,3 +129,26 @@ flowchart TD
 ```
 
 ---
+### Evaluacion en parejas
+
+**Pregunta 1**
+- La bienvenida explica súper claro qué hace el bot desde el inicio. Solo que si al final le dices que "Sí" quieres hacer otra consulta, no te vuelve a mostrar las opciones y te toca adivinar qué escribir.
+- Mejora: Que al responder que "Sí", el bot te vuelva a desplegar el menú principal.
+
+**Pregunta 2**
+- La idea está genial, pero faltó agregar la sección del diálogo de muestra al final del archivo, así que no pudimos probar las frases exactas del bot.
+- Mejora: Incluir un pequeño guion de conversación de ejemplo al final del documento.
+
+**Pregunta 3**
+- Todo lo que ofrece el bot coincide con las API que consulta. Sin embargo, si le pones desde el primer mensaje "dónde está mi pedido 5678", te lo vuelve a pedir en lugar de buscarlo de una sola vez
+- Si el usuario ya mandó el número de 4 dígitos en el primer texto, saltarse la pregunta e ir directo a buscar el pedido.
+
+**Pregunta 4**
+- Los mensajes de error son súper amables, claros y cero técnicos. Lo único es que si alguien se equivoca varias veces, el bot se queda en un ciclo infinito de error.
+- Poner un límite para que al tercer intento fallido te pase con una persona.
+
+**Pregunta 5**
+- ¡Esta parte quedó perfecta! En cualquier punto puedes escribir "ayuda" o "cancelar" para reiniciar, y siempre te pregunta si necesitas algo más antes de despedirse.
+- Solo asegurar que al volver al inicio se muestren de nuevo los botones interactivos.
+
+---
