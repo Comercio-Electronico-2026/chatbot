@@ -11,41 +11,32 @@
 ### Lista de chequeo
 
 **¿Quién usará el chatbot?**
-Fans y coleccionistas de Pokémon que compran en línea: personas que buscan sobres de cartas de expansiones específicas, y clientes interesados en ropa y merchandising con temática Pokémon. También padres/madres que compran regalos para sus hijos sin conocer a fondo el producto.
+Fans y coleccionistas de Pokémon que compran en línea: personas que buscan sobres de cartas de expansiones específicas, y clientes interesados en ropa y merchandising con temática Pokémon. 
 
 **¿Qué problema o problemas resuelve?**
 - Reduce el tiempo de espera para saber si un producto específico (sobre, playera, talla) está disponible, sin tener que llamar o escribir a un vendedor.
 - Da seguimiento al estado de un pedido sin depender de que un agente humano revise manualmente.
-- Responde preguntas frecuentes (precios, envíos, promociones) fuera del horario de atención.
 
 **¿Qué necesidades específicas tienen?**
 - Saber si hay stock de un producto puntual antes de decidir comprar (ej. sobres de una expansión reciente, talla de una playera).
-- Confirmar el precio y las formas de pago/envío antes de comprar.
 - Dar seguimiento a un pedido ya realizado.
-- Enterarse de promociones o restocks sin tener que revisar redes sociales constantemente.
 
 **¿Qué preguntas se pueden hacer?**
 - "¿Tienen sobres de Scarlet & Violet?"
 - "¿Qué tallas hay de la playera de Charizard?"
 - "¿Cuánto cuesta el sobre de Paldea Evolved?"
 - "¿Dónde está mi pedido 1234?"
-- "¿Hacen envíos fuera de San Salvador?"
-- "¿Hay alguna promoción esta semana?"
-- "Quiero hablar con una persona"
 
 **¿Qué tipo de respuesta espero en cada caso?**
-- Disponibilidad de producto → selección de lista (categoría: sobres / ropa / otros artículos).
-- Talla → selección de lista (S, M, L, XL) o texto corto.
+- Producto / Talla: Selección de lista o texto corto.
 - Número de pedido → texto/número (4 dígitos).
-- Precio → número (mostrado por el bot, no ingresado por el usuario).
-- Ciudad/dirección de envío → texto libre corto.
 - Confirmaciones (sí/no, continuar) → selección de botón.
 
 **¿Cuál es su edad, ocupación, intereses, nivel de experiencia con tecnología?**
 - Edad: principalmente 13–35 años (adolescentes coleccionistas y jóvenes adultos), con un segmento secundario de padres 30–50 años comprando regalos.
 - Ocupación: estudiantes, profesionales jóvenes, coleccionistas/gamers.
 - Intereses: cartas coleccionables, videojuegos, anime, moda casual con temática geek.
-- Nivel tecnológico: medio a alto en el segmento principal (usan Telegram, redes sociales, marketplaces); medio-bajo en el segmento de padres, por lo que el bot debe evitar tecnicismos y ofrecer siempre opciones guiadas (botones) además de texto libre.
+- Nivel tecnológico: medio a alto. Interacción simplificada mediante botones guiados.
 
 **¿Cuáles son los escenarios alternativos (errores, datos faltantes, el usuario cambia de tema)?**
 - El usuario pregunta por un producto que no existe o está agotado.
@@ -53,14 +44,11 @@ Fans y coleccionistas de Pokémon que compran en línea: personas que buscan sob
 - El usuario cambia de intención a mitad del flujo (ej. está dando su número de pedido y de repente pregunta por una playera).
 - El usuario escribe algo que el bot no reconoce (mensaje ambiguo o fuera de dominio).
 - El usuario pide ayuda o cancelar en cualquier punto del flujo.
-- El usuario pide hablar con una persona.
-- Falla la conexión con la API de catálogo o de pedidos.
 
 **¿UI, Accesibilidad?**
 - Uso de *inline keyboards* de Telegram para las opciones principales (Sobres 🎴, Ropa 👕, Otros artículos 🎁, Estado de pedido 📦), reduciendo la necesidad de escribir texto libre.
 - Mensajes cortos, sin jerga técnica ni abreviaciones de sistema (nunca mostrar errores tipo "Error 404").
 - Texto siempre legible sin depender de imágenes; si se envía una foto de producto, se incluye descripción en texto.
-- El bot debe reconocer variantes comunes de una misma respuesta (ej. "1", "uno", "el primero") cuando se presentan listas numeradas.
 
 **¿Cómo haré para validar mi prototipo?**
 Mediante la técnica del Mago de Oz (Actividad 4): un compañero simula ser el bot siguiendo únicamente el guion y el diagrama de flujo de este documento, mientras otro actúa como usuario real, sin mejorar ni improvisar respuestas. Esto permite detectar huecos en el diseño antes de programarlo.
@@ -86,9 +74,6 @@ Mediante la técnica del Mago de Oz (Actividad 4): un compañero simula ser el b
 | Estado de un pedido | "¿dónde está mi pedido 1234?" | Alta | 1 | API de pedidos |
 | Consultar disponibilidad de ropa/talla | "¿qué tallas hay de la playera de Charizard?" | Alta | 1 | API de catálogo (ropa) |
 | Consultar precio de un producto | "¿cuánto cuesta el sobre de Paldea?" | Media | 2 | API de catálogo |
-| Ver promociones o restocks | "¿hay alguna oferta esta semana?" | Media | 2 | API de promociones |
-| Consultar envíos y métodos de pago | "¿hacen envíos a Santa Ana?" | Media | 3 | Contenido estático / FAQ |
-| Hablar con un agente humano | "quiero hablar con una persona" | Baja | 2 | Transferencia a humano |
 | Cancelar / pedir ayuda | "cancelar", "ayuda", "menú" | Baja | 1 | Control de flujo interno |
 
 ---
@@ -131,23 +116,16 @@ flowchart TD
     G4 --> Z
     G5 --> Z
 
-    C -->|Promociones| H[Consultar API de promociones y mostrar ofertas activas]
-    H --> Z
 
-    C -->|Envíos y pagos| I[Responder con información estática de FAQ]
-    I --> Z
 
-    C -->|Hablar con humano| J[Transferir a agente / mostrar contacto]
-    J --> Z
-
-    C -->|Mensaje no reconocido| K["No entendí eso. Puedo ayudarte con sobres, ropa, otros artículos o el estado de tu pedido. Escribe 'ayuda' si necesitas ver las opciones de nuevo."]
-    K --> C
+    C -->|Mensaje no reconocido| H["No entendí eso. Puedo ayudarte con sobres, ropa, otros artículos o el estado de tu pedido. Escribe 'ayuda' si necesitas ver las opciones de nuevo."]
+    H --> C
     
-    C -->|cancelar / ayuda en cualquier punto| L[Volver al menú principal]
-    L --> B
+    C -->|cancelar / ayuda en cualquier punto| I[Volver al menú principal]
+    I --> B
 
     Z -->|Sí| C
-    Z -->|No| M["Despedida: ¡Gracias por visitar PokeThings! Atrápalos a todos 🎴"]
+    Z -->|No| J["Despedida: ¡Gracias por visitar PokeThings! Atrápalos a todos 🎴"]
 ```
 
 ---
