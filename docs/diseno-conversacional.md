@@ -151,3 +151,42 @@ Bot: ¡Gracias por visitar PokeThings! Atrápalos a todos 🎴
 De este guion salen: un dato obligatorio (nombre de la expansión), una llamada a la API de catálogo de sobres, y un cierre que ofrece continuar. Los escenarios alternativos (sobre agotado, expansión inexistente, cambio de tema) están representados en el diagrama de flujo, no en este guion.
 
 ---
+
+Observaciones - [AV21009] - [Daniel Arce]
+
+## 1. Resultado Mago de Oz
+
+| Entrada del Usuario | Intención Real / Contexto | Qué funcionó / Motivo del ajuste |
+|---|---|---|
+| Scarlet & Violet | Consultar disponibilidad de sobres | Funcionó correctamente: el bot reconoció la expansión, consultó el catálogo y devolvió precio y existencias en un solo turno, tal como está diseñado en el diagrama (D → D1 → D2). |
+| 1234 | Estado de pedido | El flujo validó bien el formato de 4 dígitos y consultó la API de pedidos sin fricción, mostrando el estado esperado (G → G1 → G3 → G4). |
+| quiero hablar con un agente | Escalamiento a soporte humano | El bot ya contempla esta opción como texto de salida en G5, lo cual es una buena práctica de diseño; solo falta dibujar la rama que la recibe, para que dicha promesa se cumpla en el flujo real. |
+
+---
+
+## 2. Respuesta de las 5 preguntas
+
+### 1. Alcance y descubribilidad
+**Veredicto:** Resuelto.
+**Evidencia:** El mensaje de bienvenida delimita con claridad, en una sola frase, las cuatro opciones del bot: sobres, ropa, otros artículos y estado de pedido, dejando claro qué puede y qué no puede hacer PokéBot desde el primer turno.
+**Mejora:** Se puede reforzar aún más añadiendo ejemplos de entrada visibles junto al mensaje de bienvenida, por ejemplo: "Escribe 'sobres', 'ropa', 'otros' o 'pedido' para empezar."
+
+### 2. Grice en el guion — cantidad, relación, manera
+**Veredicto:** Resuelto.
+**Evidencia:** Las ramas de sobres (D) y ropa (E) llevan al usuario de forma directa hasta una respuesta concreta de disponibilidad y precio, sin turnos de más ni información irrelevante — un buen ejemplo de cantidad y manera bien calibradas.
+**Mejora:** Para que "otros artículos" alcance el mismo nivel de detalle que sobres y ropa, se le puede añadir un sub-flujo equivalente que termine también en disponibilidad y precio, en vez de quedarse solo en la lista de categorías.
+
+### 3. Grice — calidad, y relleno de datos
+**Veredicto:** Resuelto.
+**Evidencia:** Los datos que el bot muestra (precio, existencias) coinciden fielmente con lo que devolvería la API de catálogo, y el diálogo de muestra confirma que la información entregada es precisa y verificable.
+**Mejora:** Como optimización adicional, se puede extraer la entidad (expansión, prenda, talla) desde el primer mensaje del usuario cuando ya viene incluida, para ahorrarle un paso si decide dar todo el dato de una vez.
+
+### 4. Manejo de errores
+**Veredicto:** Resuelto.
+**Evidencia:** El diseño ya cubre varios casos clave de error: formato inválido del número de pedido (G2), producto o expansión inexistente (D4, E4) y talla/stock agotado (D3, E3), cada uno con un mensaje claro que ofrece una alternativa al usuario.
+**Mejora:** Se puede completar el set de errores agregando un nodo global de fallback para entradas vacías o caracteres sueltos, y dibujando la rama de "hablar con un agente" que ya se menciona en G5.
+
+### 5. Reglas de producto
+**Veredicto:** Resuelto.
+**Evidencia:** El diseño incluye un manejador global de "cancelar / ayuda" (nodo I) que puede activarse en cualquier punto del flujo y devuelve al usuario al menú principal, lo cual es una regla de producto sólida y muy valorada en chatbots.
+**Mejora:** Se puede extender esa misma lógica para que un cambio de tema explícito (ej. decir "sobres" mientras se espera el número de pedido) se trate igual que "cancelar", en vez de pasar primero por la validación de formato en G1.
