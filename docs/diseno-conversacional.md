@@ -1,77 +1,94 @@
 # Diseño conversacional - Tienda de computadoras
-
 ## Lista de chequeo
 
-- **¿Quién usará el chatbot?** Clientes interesados en comprar computadoras, accesorios o consultar productos de la tienda.
-- **¿Qué problema resuelve?** Ayuda a encontrar productos y conocer su disponibilidad sin tener que esperar atención de una persona.
-- **¿Qué necesidades específicas tienen?** Saber si hay existencias, consultar precios y pedir recomendaciones según el uso que darán al equipo.
-- **¿Qué preguntas se pueden hacer?** “¿Tienen laptops?”, “¿Cuánto cuesta una memoria RAM?”, “Necesito una computadora para estudiar” y “¿Tienen impresoras?”.
-- **¿Qué tipo de respuesta espero en cada caso?** Texto para describir productos; número para precio y existencias; selección de una lista para elegir categoría o tipo de uso.
-- **Edad, ocupación, intereses y experiencia con tecnología:** Personas de 16 años en adelante, estudiantes, profesionales y público general. Su experiencia tecnológica puede ser básica, por lo que el bot debe usar palabras sencillas.
-- **Escenarios alternativos:** Producto no encontrado, producto sin existencias, mensaje no entendido, usuario que cambia de tema o que desea cancelar la consulta.
-- **UI y accesibilidad:** Mensajes cortos, opciones numeradas, lenguaje sencillo y precios expresados claramente en dólares.
-- **¿Cómo validar el prototipo?** Probar el diálogo con compañeros y pedirles que consulten un producto, precio y disponibilidad.
-- **Pruebas de usabilidad y desempeño:** Verificar que el usuario pueda encontrar un producto sin ayuda y que el bot responda de forma clara y rápida.
-- **Privacidad:** El bot no solicitará datos personales para consultar el catálogo. Si el usuario brinda información, se utilizará solo para responder su consulta y no se almacenará.
+- **¿Quién usará el chatbot?** Clientes que quieren comprar computadoras, accesorios o consultar productos de la tienda.
+- **¿Qué problema resuelve?** Ayuda a las personas a conocer productos, precios y existencias sin tener que esperar a que alguien de la tienda responda.
+- **¿Qué necesidades específicas tienen?** Saber si un producto está disponible, conocer su precio y recibir una recomendación según el uso que le darán y el dinero que desean gastar.
+- **¿Qué preguntas se pueden hacer?** “¿Tienen laptops?”, “¿Cuánto cuesta una memoria RAM?”, “Necesito una computadora para estudiar con $700 de presupuesto”, “¿Tienen mouse inalámbrico?” y “¿Tienen impresoras?”.
+- **¿Qué tipo de respuesta espero en cada caso?** Texto para describir productos, números para precios y existencias, y listas de opciones para elegir categorías, tipo de uso o presupuesto.
+- **Edad, ocupación, intereses y experiencia con tecnología:** Personas de 16 años en adelante, estudiantes, profesionales y público general. El nivel de experiencia con tecnología puede variar, por eso el bot debe usar palabras sencillas.
+- **Escenarios alternativos:** Producto no encontrado, producto sin existencias, entrada vacía, mensaje no entendido, cambio de tema, petición fuera de alcance, falla de la API o cancelación de la consulta.
+- **UI y accesibilidad:** Mensajes cortos, opciones claras, lenguaje sencillo, precios expresados en dólares y comandos visibles como `ayuda`, `volver` y `cancelar`.
+- **¿Cómo validar el prototipo?** Se probará con compañeros usando el ejercicio de Mago de Oz: una consulta normal y otra con errores, cambio de tema y preguntas fuera del alcance del bot.
+- **Pruebas de usabilidad y desempeño:** Se verificará que el usuario pueda encontrar un producto sin ayuda, que entienda los mensajes de error y que el bot responda de forma clara.
+- **Privacidad:** El bot no solicitará ni almacenará datos personales para consultar el catálogo. Si el usuario brinda información, se utilizará solamente para responder la consulta actual.
 
 ## Inventario de intenciones
 
 | Intención | Ejemplo de enunciado | Frecuencia | Prioridad | Dato / API |
 |---|---|---:|---:|---|
-| Consultar disponibilidad | “¿Tienen laptops?” | Alta | 1 | API de catálogo: nombre del producto y existencias. |
+| Consultar disponibilidad | “¿Tienen laptop Lenovo IdeaPad?” | Alta | 1 | API de catálogo: nombre del producto y existencias. |
 | Consultar precio | “¿Cuánto cuesta una laptop Lenovo?” | Alta | 1 | API de catálogo: precio del producto. |
 | Buscar por categoría | “Quiero ver memorias RAM” | Alta | 1 | API de catálogo: productos por categoría. |
-| Pedir recomendación | “Necesito una computadora para estudiar” | Media | 2 | Catálogo: equipos según uso y presupuesto. |
+| Pedir recomendación | “Necesito una computadora para estudiar con $700” | Media | 2 | Catálogo: equipos según uso y presupuesto. |
 | Consultar accesorios | “¿Tienen mouse inalámbrico?” | Media | 2 | API de catálogo: accesorios disponibles. |
-| Pedir ayuda | “Ayuda” o “Menú” | Media | 2 | No requiere API; muestra las opciones disponibles. |
+| Pedir ayuda o menú | “Ayuda”, “Menú” o `/start` | Media | 2 | No requiere API; muestra opciones y ejemplos. |
+| Volver atrás | “Volver” | Baja | 2 | No requiere API; regresa al menú principal. |
 | Cancelar consulta | “Cancelar” | Baja | 2 | No requiere API; termina la consulta actual. |
+| Pedir atención humana | “Quiero hablar con una persona” | Baja | 3 | No requiere API; muestra información de contacto. |
 
 ## Diagrama de flujo de la conversación
 
 ```mermaid
 flowchart TD
-    A[Usuario inicia conversación] --> B[Bot saluda y muestra opciones]
+    A[Usuario inicia conversación] --> B[Bot saluda, explica qué hace y muestra ejemplos]
     B --> C{¿Qué desea consultar?}
 
-    C -->|Disponibilidad o precio| D[Bot solicita el nombre del producto]
-    C -->|Categoría| E[Bot muestra productos de la categoría]
-    C -->|Recomendación| F[Bot pregunta para qué usará la computadora]
-    C -->|Ayuda| G[Bot muestra ejemplos de preguntas]
-    C -->|Cancelar| H[Bot finaliza la consulta]
-    C -->|Mensaje no entendido| I[Bot pide escribir una opción válida]
+    C -->|Disponibilidad o precio| D{¿El usuario indicó el producto?}
+    D -->|Sí| E[Consultar catálogo]
+    D -->|No| F[Bot pide solo el dato que falta]
+    F --> E
 
-    D --> J{¿Producto encontrado?}
-    J -->|Sí| K[Bot muestra precio y disponibilidad]
-    J -->|No| L[Bot informa que no encontró el producto]
+    E --> G{¿La API respondió?}
+    G -->|Sí, hay existencias| H[Bot muestra precio y disponibilidad]
+    G -->|Sí, sin existencias| I[Bot informa que no hay existencias y ofrece alternativas]
+    G -->|Producto no encontrado| J[Bot informa que no encontró el producto y muestra categorías]
+    G -->|No| K[Bot informa que no puede consultar el catálogo y ofrece reintentar]
 
-    E --> M[Bot pregunta si desea otro producto]
-    F --> N[Bot recomienda productos disponibles]
-    G --> M
-    I --> B
-    K --> M
-    L --> M
-    N --> M
-    M -->|Sí| B
-    M -->|No| H
+    C -->|Categoría| L[Bot muestra productos de la categoría]
+    C -->|Recomendación| M[Bot pregunta para qué usará el equipo y cuál es su presupuesto]
+    M --> N[Bot recomienda productos disponibles]
+    C -->|Ayuda| O[Bot muestra ejemplos de preguntas]
+    C -->|Volver| B
+    C -->|Cancelar| P[Bot confirma el cierre de la consulta]
+    C -->|Petición fuera de alcance| Q[Bot explica lo que puede hacer y ofrece atención humana]
+    C -->|Mensaje vacío o no entendido| R{¿Ha fallado menos de 3 veces?}
+
+    R -->|Sí| S[Bot muestra ejemplos y opciones válidas]
+    R -->|No| T[Bot ofrece volver al menú o pedir atención humana]
+
+    H --> U{¿Desea hacer otra consulta?}
+    I --> U
+    J --> U
+    K --> U
+    L --> U
+    N --> U
+    O --> U
+    Q --> U
+
+    S --> B
+    T --> B
+    U -->|Sí| B
+    U -->|No| P
 ```
+
+Ahora durante la conversación, en cualquier momento el usuario puede escribir `ayuda`, `volver` o `cancelar`. Si cambia de tema, el bot va a reconocer la nueva intención y vuelve al menú correspondiente.
 
 ## Diálogo de muestra - camino feliz
 
-**Usuario:** Hola.
+> **Corrección aplicada:** ahora la bienvenida explica mejor las funciones del bot, contiene ejemplos de preguntas y se evita pedir nuevamente datos que el usuario ya había dado.
 
-**Bot:** ¡Hola! Soy el asistente de la tienda de computadoras. Puedo consultar productos, precios y disponibilidad. ¿Qué necesitas?
+**Usuario:** `/start`
 
-**Usuario:** Quiero saber si tienen laptops.
+**Bot:** ¡Hola! Soy el asistente de la tienda de computadoras. Puedo ayudarte a consultar productos, precios, existencias, accesorios y recomendaciones según tu presupuesto. Puedes preguntar por laptops, RAM, mouse o impresoras. ¿Qué necesitas?
 
-**Bot:** Sí. Tenemos laptops Lenovo, HP y Asus. ¿Buscas una laptop para estudiar, trabajar o jugar?
+**Usuario:** ¿Tienen laptop Lenovo IdeaPad para estudiar?
 
-**Usuario:** Para estudiar.
-
-**Bot:** Te recomiendo la laptop Lenovo IdeaPad con 8 GB de RAM y 512 GB SSD. Tiene un precio de $650 y está disponible. ¿Deseas consultar otro producto?
+**Bot:** Sí. Según el catálogo, tenemos la Lenovo IdeaPad con 8 GB de RAM y 512 GB SSD. Su precio es $650 y está disponible. ¿Deseas consultar otro producto o pedir una recomendación?
 
 **Usuario:** No, gracias.
 
-**Bot:** De nada. Cuando necesites consultar otro producto, escríbeme nuevamente.
+**Bot:** De nada. Consulta finalizada. Escribe `/start` cuando necesites buscar otro producto.
 
 ---
 
