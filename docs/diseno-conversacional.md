@@ -106,3 +106,55 @@ flowchart TD
     O --> Q
     
     Q --> R([Fin del flujo])
+```
+# Evaluación Pareja B - MusicHub Bot
+
+## 1. Alcance y descubribilidad
+
+**Veredicto:** Parcial
+
+**Evidencia:** El mensaje inicial explica `/catalogo` y `/pedido`, pero no deja claro qué cosas no puede hacer el bot ni menciona `/ayuda` desde el inicio.
+
+**Mejora:** Agregar una bienvenida que incluya las funciones disponibles y el comando de ayuda.
+
+---
+
+## 2. Grice: cantidad, relación y manera
+
+**Veredicto:** Resuelto
+
+**Evidencia:** Los mensajes son breves, claros y relacionados con la consulta anterior.
+
+**Mejora:** Usar siempre el mismo término, por ejemplo “pedido”, en lugar de alternar entre pedido, orden y compra.
+
+---
+
+## 3. Grice: calidad y relleno de datos
+
+**Veredicto:** Parcial
+
+**Evidencia:** El bot dice “Te avisaremos cuando sea enviado”, pero el diseño no incluye un sistema de notificaciones.
+
+**Mejora:** Cambiarlo por: “Puedes volver a consultar el estado de tu pedido con `/pedido`”.
+
+---
+
+## 4. Manejo de errores
+
+**Veredicto:** Parcial
+
+**Evidencia:** El diagrama contempla producto inexistente y pedido inválido, pero no maneja entrada sin sentido, cambio de tema, fallo de API, tres intentos ni derivación a humano.
+
+**Mejora:** Agregar esas ramas al diagrama y permitir reintentar antes de ofrecer ayuda humana.
+
+---
+
+## 5. Reglas de producto
+
+**Veredicto:** Parcial
+
+**Evidencia:** Existen `/ayuda` y `/salir`, pero no aparecen claramente disponibles durante todos los pasos del flujo.
+
+**Mejora:** Permitir `/ayuda`, `/salir` y volver al menú principal desde cualquier punto.
+
+---
