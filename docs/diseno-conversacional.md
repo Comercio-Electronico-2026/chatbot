@@ -57,9 +57,8 @@ flowchart TD
     
     N -->|"Sí"| B
     N -->|"No"| H
-
-**Veredicto final, pareja B**
 ```
+**Veredicto final, pareja B**
 
 1. **¿El mensaje de bienvenida explica en una o dos frases qué hace el bot y qué no? ¿El usuario sabe qué más puede pedir?**
 
