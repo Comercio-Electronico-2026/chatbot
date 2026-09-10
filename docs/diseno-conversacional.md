@@ -27,7 +27,7 @@ Reduce drásticamente el tiempo, la dispersión y la incertidumbre al buscar alo
 * *"Contacto del cuarto 12"*
 
 ### ¿Qué tipo de respuesta espera en cada caso?
-* **Universidad / Zona:** Texto libre o botones de sugerencia (ej. UES, UCA, Santa Tecla).
+* **Universidad / Zona:** Texto libre o selección guiada (ej. UES, UCA, Santa Tecla).
 * **Preferencia de género:** Selección cerrada (`Señoritas`, `Varones`, `Mixto`).
 * **Presupuesto máximo:** Valor numérico en USD (ej. `150`).
 * **Identificador de alojamiento:** Número entero / ID de catálogo (ej. `12`).
@@ -41,7 +41,7 @@ Reduce drásticamente el tiempo, la dispersión y la incertidumbre al buscar alo
 1. **Presupuesto no numérico o inválido:** El usuario ingresa texto ("barato", "poco") o números negativos.
 2. **Búsqueda sin coincidencias exactas:** El bot no interrumpe el flujo; informa la situación y sugiere de inmediato relajar el filtro de precio o explorar opciones en ambiente mixto.
 3. **ID de habitación inexistente o mal escrito:** El bot solicita verificar el código a partir del listado previo.
-4. **Comando de escape / reinicio:** El usuario puede escribir *"cancelar"*, *"salir"* o presionar `/start` en cualquier momento para reiniciar la consulta.
+4. **Comando de escape / reinicio global:** El usuario puede escribir `/cancel`, *"cancelar"* o presionar `/start` en **cualquier momento** de la interacción para reiniciar la consulta y limpiar el estado temporal.
 
 ### UI y Accesibilidad
 * Mensajes breves (menos de 3 párrafos) adaptados a pantallas móviles.
@@ -55,7 +55,7 @@ Reduce drásticamente el tiempo, la dispersión y la incertidumbre al buscar alo
 ### Privacidad y Manejo de Datos
 * **Datos recolectados:** Telegram User ID, nombre público y parámetros temporales de la búsqueda en curso (zona, género, presupuesto).
 * **Finalidad:** Gestión del estado conversacional y consulta a los endpoints de *El Foráneo*.
-* **Retención y eliminación:** No se almacenan credenciales ni datos bancarios. Los estados temporales de sesión expiran tras 2 horas de inactividad.
+* **Retención y eliminación:** No se almacenan credenciales ni datos bancarios. Los estados temporales de sesión expiran tras 2 horas de inactividad o al invocar `/cancel`.
 
 ---
 
@@ -66,7 +66,7 @@ Reduce drásticamente el tiempo, la dispersión y la incertidumbre al buscar alo
 | **Buscar habitaciones** | *"Busco cuarto para señoritas cerca de la UES por menos de $150"* | Alta | 1 | `GET /api/alojamientos/?universidad={u}&max_precio={p}&genero={g}` |
 | **Consultar detalle** | *"¿Qué incluye el alojamiento #12?"* o *"Detalle 12"* | Alta | 1 | `GET /api/alojamientos/{id}/` |
 | **Contactar arrendador** | *"Quiero el WhatsApp del dueño del cuarto 12"* | Media | 2 | `GET /api/alojamientos/{id}/contacto/` |
-| **Ayuda / Cancelar** | *"Ayuda"*, *"cancelar"*, *"¿cómo funciona?"* | Baja | 3 | Lógica interna del bot (sin llamada a API) |
+| **Ayuda / Cancelar** | *"Ayuda"*, `"/cancel"`, *"cancelar"*, *"¿cómo funciona?"* | Media | 2 | Lógica interna del bot (sin llamada a API) |
 
 ---
 
@@ -74,6 +74,7 @@ Reduce drásticamente el tiempo, la dispersión y la incertidumbre al buscar alo
 
 * **Usuario:** `/start`
 * **Bot:** ¡Hola! 👋 Bienvenido a **El Foráneo Bot**. Te ayudo a encontrar habitación o pupilaje cerca de tu universidad en El Salvador. ¿Te gustaría buscar opciones disponibles ahora?
+  * [🔍 Buscar cuarto]  [ℹ️ Ayuda]
 * **Usuario:** Sí, quiero buscar cuarto.
 * **Bot:** Perfecto. ¿Cerca de qué universidad o en qué zona buscas? (Ejemplo: UES, UCA, Santa Tecla).
 * **Usuario:** UES
@@ -105,36 +106,47 @@ Reduce drásticamente el tiempo, la dispersión y la incertidumbre al buscar alo
 
 ```mermaid
 flowchart TD
-    Start([Inicio: /start o saludo]) --> Saludo[Bot saluda y explica propósito]
-    Saludo --> PideZona[Bot solicita Universidad o Zona]
+    Start([Inicio: /start o saludo]) --> Saludo[Bot: Bienvenida y menú inicial]
+    
+    Saludo --> EsperaInicio[/Usuario responde confirmación o /buscar/]
+    EsperaInicio --> CheckCancelStart{¿Escribió /cancel?}
+    CheckCancelStart -- Sí --> CancelGlobal
+    CheckCancelStart -- No --> CheckDeseaBuscar{¿Desea buscar?}
+    
+    CheckDeseaBuscar -- No / Ayuda --> MuestraAyuda[Bot: Muestra instrucciones de uso] --> Start
+    CheckDeseaBuscar -- Sí --> PideZona[Bot solicita Universidad o Zona]
     
     PideZona --> InpZona[/Usuario ingresa zona/]
-    InpZona --> CheckCancel1{¿Escribió 'cancelar'?}
-    CheckCancel1 -- Sí --> FinCancel[Bot: Operación cancelada. Escribe /start para reiniciar]
-    CheckCancel1 -- No --> PideGenero[Bot solicita Género: Señoritas / Varones / Mixto]
+    InpZona --> CheckCancelZona{¿Escribió /cancel?}
+    CheckCancelZona -- Sí --> CancelGlobal
+    CheckCancelZona -- No --> PideGenero[Bot solicita Género: Señoritas / Varones / Mixto]
     
     PideGenero --> InpGenero[/Usuario ingresa género/]
-    InpGenero --> CheckGeneroValido{¿Opción válida?}
-    CheckGeneroValido -- No --> ErrorGenero[Bot: Indica Señoritas, Varones o Mixto]
-    ErrorGenero --> PideGenero
+    InpGenero --> CheckCancelGen{¿Escribió /cancel?}
+    CheckCancelGen -- Sí --> CancelGlobal
+    CheckCancelGen -- No --> CheckGeneroValido{¿Opción válida?}
+    
+    CheckGeneroValido -- No --> ErrorGenero[Bot: Indica Señoritas, Varones o Mixto] --> PideGenero
     CheckGeneroValido -- Sí --> PidePrecio[Bot solicita Presupuesto Máximo en USD]
     
     PidePrecio --> InpPrecio[/Usuario ingresa presupuesto/]
-    InpPrecio --> CheckPrecioNum{¿Es número > 0?}
-    CheckPrecioNum -- No --> ErrorPrecio[Bot: Ingresa un monto válido en números, ej: 150]
-    ErrorPrecio --> PidePrecio
+    InpPrecio --> CheckCancelPrecio{¿Escribió /cancel?}
+    CheckCancelPrecio -- Sí --> CancelGlobal
+    CheckCancelPrecio -- No --> CheckPrecioNum{¿Es número > 0?}
+    
+    CheckPrecioNum -- No --> ErrorPrecio[Bot: Ingresa un monto válido en números, ej: 150] --> PidePrecio
     CheckPrecioNum -- Sí --> ConsultaAPI[Llamada API: GET /api/alojamientos/]
     
     ConsultaAPI --> CheckResultados{¿Hay resultados?}
-    CheckResultados -- No --> Sugerencia[Bot: Sin resultados exactos. Sugiere ampliar precio o ver Mixto]
-    Sugerencia --> PidePrecio
-    
+    CheckResultados -- No --> Sugerencia[Bot: Sin resultados exactos. Sugiere ampliar precio o ver Mixto] --> PidePrecio
     CheckResultados -- Sí --> MuestraLista[Bot lista alojamientos con ID y precio]
-    MuestraLista --> EsperaAccion[/Usuario pide Detalle o Contacto con ID/]
     
-    EsperaAccion --> CheckIDValido{¿ID existe en catálogo?}
-    CheckIDValido -- No --> ErrorID[Bot: ID no encontrado. Verifica el número de la lista]
-    ErrorID --> EsperaAccion
+    MuestraLista --> EsperaAccion[/Usuario pide Detalle, Contacto o /cancel/]
+    EsperaAccion --> CheckCancelFin{¿Escribió /cancel?}
+    CheckCancelFin -- Sí --> CancelGlobal
+    CheckCancelFin -- No --> CheckIDValido{¿ID existe en catálogo?}
+    
+    CheckIDValido -- No --> ErrorID[Bot: ID no encontrado. Verifica el número de la lista] --> EsperaAccion
     CheckIDValido -- Sí --> DetalleOContacto{¿Tipo de petición?}
     
     DetalleOContacto -- Detalle --> MuestraDetalle[Bot muestra resumen + Enlace web al anuncio con fotos]
@@ -143,22 +155,5 @@ flowchart TD
     MuestraDetalle --> PreguntaCierre[Bot: ¿Deseas el contacto o hacer otra consulta?]
     MuestraContacto --> PreguntaCierre
     PreguntaCierre --> FinCiclo([Continúa sesión o usuario finaliza])
-
----
-
-## 5. Revisión entre Pares (Actividad 4)
-
-### Evaluación Heurística de Grice y Mago de Oz
-A partir de la simulación del recorrido conversacional con la técnica del Mago de Oz y el análisis de las heurísticas conversacionales de Grice, se detectaron puntos de fricción y ambigüedad que requerían ajustes en el diseño:
-
-1. **Ajuste 1 (Máxima de Modo / Claridad):**
-   * *Observación:* En el saludo inicial se pedía texto libre (*"Escribe buscar para comenzar"*), lo cual generaba fallos si el usuario escribía variantes naturales como *"hola"*, *"sí"* o frases largas.
-   * *Cambio aplicado:* Se definieron comandos explícitos (`/buscar`, `/ayuda`) y botones de respuesta rápida para guiar la interacción y evitar entradas ambiguas o errores de tipeo.
-
-2. **Ajuste 2 (Máxima de Cualidad / Cobertura real):**
-   * *Observación:* El bot no contemplaba una respuesta transparente cuando el usuario solicitaba una zona o universidad no cubierta por la plataforma (por ejemplo, Santa Ana o San Miguel).
-   * *Cambio aplicado:* Se incorporó un escenario alternativo donde el bot aclara honestamente la falta de cobertura en ese punto y sugiere de inmediato las universidades disponibles en el sistema (UES, UCA, Santa Tecla).
-
-3. **Ajuste 3 (Máxima de Cantidad y Control de Usuario):**
-   * *Observación:* Al presentar las opciones de alojamiento, si ninguna satisfacía al estudiante, la conversación quedaba en un callejón sin salida forzándolo a reiniciar todo con `/start`.
-   * *Cambio aplicado:* Se añadieron salidas explícitas de control al final de la lista: opciones de paginación (*"Ver más opciones"*) y un acceso rápido para *"Modificar búsqueda"* sin perder la sesión.
+    
+    CancelGlobal[Bot: Operación cancelada] --> ResetState[Limpiar estado temporal de sesión] --> Start
