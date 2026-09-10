@@ -438,3 +438,29 @@ En esta primera versión no realizará:
 - Atención de consultas que no estén relacionadas con el catálogo de productos.
 
 
+# 14. Evaluación de Diseño Conversacional (revisado por HV21011)
+
+### 1. Alcance y descubribilidad:
+* *Veredicto:* Parcial.
+* *Evidencia:* El mensaje inicial dice "¿Qué deseas hacer?", pero no muestra botones ni los comandos exactos disponibles.
+* *Mejora:* Reescribir el saludo, especificando funciones y comandos disponibles, por ejemplo: "¡Hola! Soy FerreBot. Puedo ayudarte a buscar productos. Selecciona una opción: /buscar, /ayuda".
+
+### 2. Grice en el guion (cantidad, relación, manera):
+* *Veredicto:* Resuelto.
+* *Evidencia:* El diálogo de muestra es directo, hace una sola pregunta a la vez ("¿Qué producto buscas?") y no utiliza lenguaje técnico de WooCommerce.
+* *Mejora:* Mantener este formato conciso en los mensajes de error.
+
+### 3. Grice (calidad y relleno de datos):
+* *Veredicto:* Parcial.
+* *Evidencia:* Si en el primer turno el usuario dice directamente "Quiero buscar un taladro", el flujo igual lo obligaría a pasar por el nodo "¿Qué producto buscas?" en lugar de extraer el dato.
+* *Mejora:* Agregar una condición en el diagrama que verifique si el producto ya fue mencionado en la intención inicial para saltar directo a la API.
+
+### 4. Manejo de errores:
+* *Veredicto:* No resuelto (incompleto).
+* *Evidencia:* El diagrama tiene ramas para "Entrada válida = No" y "La API respondió = No", pero no aplica restricciones ni máximo de intentos.
+* *Mejora:* Agregar un contador de fallos en el nodo de entrada inválida y derivar a un humano tras el tercer error consecutivo.
+
+### 5. Reglas de producto:
+* *Veredicto:* Resuelto.
+* *Evidencia:* El bot contempla /cancelar y /ayuda desde el nodo de búsqueda, y cierra el ciclo adecuadamente preguntando "¿Deseas buscar otro producto?" para ofrecer continuidad.
+* *Mejora:* Se recomienda /cancelar y /ayuda como comandos globales disponibles desde cualquier estado de la conversación.
