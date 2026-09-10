@@ -68,3 +68,27 @@ flowchart TD
     L -->|Sí| B
     L -->|No / Cancelar| M[Despedida y fin de interacción]
  ```
+
+## EVALUACION DE LAS 5 PREUGNTAS
+1. Alcance y descubribilidad
+Veredicto: Parcial.  
+Evidencia: El mensaje de bienvenida en el diálogo de muestra explica de manera concisa la función del bot ("Puedo ayudarte a consultar precios, catálogo y disponibilidad de nuestros productos"). Sin embargo, no presenta botones o comandos directos para guiarlo en el primer turno sin tener que adivinar.  
+Mejora concreta: Ofrecer accesos directos visibles.
+
+2. Grice en el guion — cantidad, relación, manera
+Veredicto: Resuelto.  
+Evidencia: En el diálogo de muestra, el bot responde exactamente a lo que se consulta sin saturar con texto innecesario. Mantiene la relevancia directa con el turno anterior, utiliza un lenguaje claro en dólares ($) y evita tecnicismos confusos o preguntas dobles.  
+
+3. Grice — calidad, y relleno de datos
+Veredicto: Parcial.  
+Evidencia: El bot utiliza una API para dar precios y stock reales. En el ejemplo de chat entiende el producto a la primera sin hacer repetir información, pero el diagrama de flujo no aclara qué hace si el usuario escribe solo "Hola" sin nombrar un producto.  
+Mejora concreta: Agregar un paso en el diagrama que pregunte por el producto únicamente cuando la persona no lo haya mencionado al inicio. 
+
+4. Manejo de errores (Guion 2)
+Veredicto: No resuelto.  
+Evidencia: Frente a las situaciones de fricción (entradas sin sentido, datos mal escritos, cambios de tema o peticiones fuera de alcance), el diagrama de flujo solo cuenta con una rama genérica G [Mensaje de aclaración + sugerir menú]. No existe una estrategia de reparación por niveles, no se contempla el límite de 3 intentos, no se maneja el cambio de contexto a mitad de interacción ni existe un punto de derivación a un agente humano.  
+Mejora concreta: Añadir manejo de errores con contador de fallos
+
+5. Reglas de producto
+Veredicto: Parcial.  Evidencia: El bot cumple con cerrar cada turno ofreciendo continuar (L{¿Desea consultar otro producto?}) y no realiza acciones irreversibles al ser un bot puramente informativo. No obstante, aunque el inventario contempla la intención "Cancelar" y el comando /help, el diagrama de flujo solo sitúa la cancelación al final de la interacción (L -->|No / Cancelar| M), impidiendo al usuario cancelar o pedir ayuda libremente en pasos intermedios.  
+Mejora concreta: Agregar una regla global de interrupción en el diagrama de flujo
