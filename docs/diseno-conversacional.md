@@ -142,3 +142,19 @@ Bot: ¡Listo! Tu cita quedó agendada para el jueves 11 a las 11:00 am. Te envia
 ```
 
 De este guion salen: tres datos obligatorios (servicio, fecha/hora, nombre y teléfono), una llamada a la API de citas para crear el registro, validación del formato del teléfono, y un cierre que confirma y ofrece continuar. Los escenarios alternativos (fecha sin espacio, teléfono inválido, cambio de tema, cancelación) están representados en el diagrama de flujo de la sección 3, no en este guion.
+
+# Ejercicio de Laboratorio 5a
+## Notas del Ejercicio (Mago de Oz)
+### Guion 1, Camino Feliz
+sin errores ni confusión. Único punto débil: turno de confirmación muy cargado. Cierre menciona recordatorio no respaldado
+### Guion 2, Fricción
+Texto libre en vez de botón: resuelto en un reintento.
+Fecha sin disponibilidad: resuelto, ofrece alternativas.
+Teléfono inválido: sin límite de intentos definido
+Cambio de tema: solo cubierto en el paso de horario, no en el resto del flujo.
+## Evaluación las 5 preguntas
+- Alcance y descubribilidad — Resuelto. Bienvenida explica qué hace el bot y ofrece botones desde el primer turno.
+- Grice — cantidad, relación, manera — Resuelto. Un dato por turno, lenguaje simple. Mejora: separar el bloque de confirmación (resumen + pregunta) en dos turnos.
+- Grice — calidad y relleno de datos — Parcial. Promete recordatorio automático sin API/intención que lo respalde. Mejora: quitar la frase o agregar la intención al inventario.
+- Manejo de errores (Guion 2) — Parcial. Tiene rama para texto libre, fecha sin espacio y teléfono inválido. Falta rama para usuario inactivo y límite de reintentos con derivación a humano.
+- Reglas de producto — Parcial. Se puede cancelar y la confirmación es explícita antes de la API. Falta botón "Atrás" en pasos intermedios (solo existe cancelar todo).
