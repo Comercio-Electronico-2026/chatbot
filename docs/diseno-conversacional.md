@@ -151,15 +151,43 @@ flowchart TD
     end
 ```
 ---
+# Observaciones - MC21105 - David Alexander Méndez Cuéllar
 
-### Ajustes y Correcciones al Documento
+## 1. Resultado Mago de Oz
 
-* **Sección 1 (Lista de Chequeo):**
-  * **¿Qué tipo de respuesta espero en cada caso?:** Agregar qué ocurre si la búsqueda devuelve varios artículos parecidos (ejemplo: *"El bot muestra una lista de 3 a 5 coincidencias con sus respectivos enlaces para que el usuario elija"*).
-  * **Escenarios alternativos:** Añadir la contingencia de fallo de infraestructura: *"Fallo del servidor/API: El bot notifica un inconveniente temporal de conexión y sugiere intentar nuevamente en un momento"*.
+| Entrada del Usuario | Intención Real / Contexto | Motivo del Fallo en el Diseño |
+| :--- | :--- | :--- |
+| `guantes` | Búsqueda general de producto | El flujo original asume que la API siempre devuelve un único producto exacto o nada; no contempla la presentación estructurada cuando existen múltiples coincidencias para que el usuario elija. |
+| `.` | Entrada vacía o carácter huérfano | El bucle de reintento en validación de texto carece de salida por escape o límite de intentos, atrapando al usuario si insiste con entradas cortas o inválidas. |
+| `error 500 / caída de red` | Fallo de conexión con la API de WooCommerce/DuckDNS | El diseño asume respuestas siempre exitosas (200 OK) y no define un nodo de error de infraestructura que informe al usuario y permita reintentar. |
 
-* **Sección 2 (Inventario de Intenciones):**
-  * **Intención `ayuda_menu`:** Incluir explícitamente el enunciado de ejemplo `/help` y definir si se manejará `/help` o `/ayuda` (o ambos como alias).
+---
 
-* **Sección 3 (Diálogo de Muestra):**
-  * **Menú de bienvenida y opciones de cierre:** Asegurar que el bot mencione explícitamente los comandos `/cancelar` y `/help` para mantener coherencia con las intenciones declaradas y los requisitos de la guía.
+## 2. Respuesta de las 5 preguntas
+
+### 1. Alcance y descubribilidad
+* **Veredicto:** Resuelto.
+* **Evidencia:** El mensaje de bienvenida delimita con claridad el alcance de la tienda deportiva (búsqueda de productos, catálogo y promociones), permitiendo entender la función principal desde el inicio.
+* **Mejora:** Incluir en el saludo inicial todos los comandos de control declarados en el inventario (`/catalogo`, `/ofertas`, `/help`, `/cancelar`) para evitar que el usuario deba adivinarlos.
+
+### 2. Grice en el guion — cantidad, relación, manera
+* **Veredicto:** Parcial.
+* **Evidencia:** La ficha de producto individual cumple con los datos requeridos (nombre, categoría, precio, stock y enlace), pero ante términos genéricos que arrojan varios resultados no se definió cómo dosificar la información sin saturar la pantalla.
+* **Mejora:** Implementar un turno breve de desambiguación cuando existan múltiples coincidencias: listar de 3 a 5 artículos numerados con nombre, precio y enlace directo para que el usuario decida el siguiente paso.
+
+### 3. Grice — calidad, y relleno de datos
+* **Veredicto:** Parcial.
+* **Evidencia:** Los enlaces directos y la consulta de stock apuntan correctamente a la tienda en DuckDNS, pero el flujo no prevé la contingencia de fallos técnicos o caídas de conectividad con la API.
+* **Mejora:** Agregar una rama de contingencia técnica que informe con veracidad: *«Tuvimos un problema temporal de conexión con el catálogo. Por favor, intenta de nuevo en unos momentos.»*
+
+### 4. Manejo de errores
+* **Veredicto:** Parcial.
+* **Evidencia:** El diseño contempla el caso de producto no encontrado sugiriendo categorías, pero carece de un fallback estándar para mensajes fuera de dominio y mantiene un bucle rígido ante términos de búsqueda vacíos.
+* **Mejora:** Crear un nodo global de fallback que capture mensajes no reconocidos sugiriendo comandos activos, y habilitar la intercepción de `/cancelar` dentro de la solicitud de reintento de texto.
+
+### 5. Reglas de producto
+* **Veredicto:** Parcial.
+* **Evidencia:** Se definen intenciones para `/cancelar` y `/help`, pero el diagrama solo permitía cancelar en fases finales o en la entrada de búsqueda, dejando el comando inerte si el usuario deseaba interrumpir otra sección. Además, en el cierre faltaba el nodo explícito para capturar la decisión del usuario.
+* **Mejora:** Estandarizar la intercepción global de `/cancelar` y `/help` en cualquier punto de la conversación, e insertar el nodo de entrada de usuario previo a la evaluación de cierre (`¿Continuar? Sí / No`).
+
+
