@@ -57,6 +57,7 @@ graph TD
     H --> K
     I --> B
     J --> B
+```
 
 ## Cambios aplicados tras la revisión entre pares (Pareja B: JO20004)
 
