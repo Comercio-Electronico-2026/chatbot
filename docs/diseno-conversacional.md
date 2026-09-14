@@ -1,85 +1,96 @@
 # Diseño Conversacional: Bot de Comercio Electrónico CET115
 
-**Estudiante:** Carnet GT22004  
-**Asignatura:** Comercio Electrónico (CET115 - Ciclo II / 2026)  
-**Docente:** Ing. William Ernesto Vides Ortez  
-**Entregable:** Guía 5  - Diseño y puesta en marcha del bot
+**Estudiante:** Carnet GT22004
+**Asignatura:** Comercio Electrónico (CET115 - Ciclo II / 2026) 
+**Docente:** Ing. William Ernesto Vides Ortez 
+**Entregable:** Guía 5 - Diseño y puesta en marcha del bot 
+
 ---
 
-## 1. Lista de Chequeo de Diseño Conversacional 
+## 1. Lista de Chequeo de Diseño Conversacional
 
-* **¿Quién usará el chatbot?:** Deportistas, entusiastas del entrenamiento y clientes de la tienda deportiva en línea que buscan equipamiento, calzado, indumentaria o suplementos, y desean consultar disponibilidad, precios u ofertas sin recorrer manualmente el sitio web.
-* **¿Qué problema o problemas resuelve?:** Automatiza la atención de primer contacto para preguntas repetitivas sobre artículos deportivos, promociones de temporada y existencias, brindando respuestas inmediatas y evitando esperas de soporte.
-* **¿Qué necesidades específicas tienen?:** Confirmar rápidamente si un artículo deportivo está en inventario, ver precios y descuentos activos con el comando `/ofertas`, y recibir el enlace directo para comprar en la tienda.
+* **¿Quién usará el chatbot?:** Clientes, deportistas y personas interesadas en el entrenamiento físico que buscan consultar disponibilidad de existencias, características y promociones en la tienda deportiva digital de forma ágil desde Telegram.
+* **¿Qué problema o problemas resuelve?:** Automatiza la atención de primer contacto resolviendo dudas recurrentes sobre precios, stock inmediato y descuentos vigentes sin necesidad de navegar manualmente el sitio web.
+* **¿Qué necesidades específicas tienen?:** Buscar artículos específicos por nombre, listar promociones activas con `/ofertas`, consultar las divisiones de la tienda con `/catalogo` y obtener enlaces directos a la ficha del producto.
 * **¿Qué preguntas se pueden hacer?:**
-  * "¿Tienen disponible [producto]?"
-  * "¿Cuáles son las ofertas de hoy?" 
-  * "¿Qué precio tiene [producto]?"
-  * "¿Qué categorías deportivas manejan?"
-  * "¿Qué comandos puedo utilizar?"
+  * "¿Tienen guantes de boxeo?"
+  * "¿Cuáles son las ofertas de hoy?"
+  * "¿Qué precio tienen las zapatillas running?"
+  * "¿Qué categorías deportivas manejan?"
+  * "¿Cómo cancelo una consulta?"
 * **¿Qué tipo de respuesta espero en cada caso?:**
-  * *Consulta de artículo:* Texto estructurado con el nombre del [producto], precio regular/rebajado en USD, disponibilidad (en stock / agotado) y enlace web directo.
-  * *Consulta de promociones (`/ofertas`):* Listado de [producto] en descuento, mostrando precio anterior, precio rebajado y disponibilidad.
-  * *Consulta general de catálogo:* Lista de [categoría] deportivas disponibles.
-  * *Navegación / Comandos:* Respuestas directas y concisas mediante comandos (`/start`, `/catalogo`, `/ofertas`, `/cancelar`).
-* **¿Cuál es su edad, ocupación, intereses, nivel de experiencia con tecnología?:** Usuarios de 16 a 50 años, estudiantes, atletas o personas interesadas en el fitness y la actividad física, con nivel tecnológico básico a intermedio habituados al uso de aplicaciones de mensajería.
-* **¿Cuáles son los escenarios alternativos (errores, datos faltantes, el usuario cambia de tema)?:**
-  * *Sin promociones vigentes:* Si no hay artículos deportivos con rebaja al usar `/ofertas`, el bot notifica que no hay ofertas activas y sugiere ver el catálogo general.
-  * *Sin coincidencias en búsqueda:* Si la búsqueda de [producto] no devuelve resultados, el bot informa la falta de existencias y lista las [categoría] deportivas principales.
-  * *Entrada vacía o muy corta:* El bot solicita escribir el nombre del artículo deportivo de forma más descriptiva.
-  * *Mensaje no reconocido (Fallback):* El bot responde con amabilidad explicando que no comprende la consulta y despliega los comandos disponibles.
-  * *Interrupción o cambio de tema:* El usuario puede escribir `/cancelar` para anular la consulta actual y volver al inicio.
-* **¿UI, Accesibilidad?:** Mensajes breves y fáciles de leer en pantalla móvil, uso de viñetas para características y opciones guiadas sin tecnicismos.
-* **¿Cómo haré para validar mi prototipo? (Pruebas de usabilidad, desempeño):** Validación con la técnica de Mago de Oz en la revisión entre pares, evaluando la claridad y pertinencia turno a turno según las heurísticas de Grice.
-* **¿Privacidad? (Recolectar datos: para qué, cuáles y cuándo eliminarlos):** Solo se procesa el identificador de chat de Telegram y la palabra clave del [producto] deportivo consultado. No se solicitan datos personales ni métodos de pago en el chat, y los estados temporales de sesión se liberan al terminar la conversación.
+  * *Consulta de artículo único:* Ficha estructurada con nombre, categoría, precio en USD, estado de existencias (unidades disponibles / agotado) y enlace web directo.
+  * *Múltiples coincidencias:* Lista numerada con los artículos encontrados para que el usuario elija cuál consultar en detalle.
+  * *Consulta de promociones (`/ofertas`):* Listado de productos en descuento con precio regular tachado, precio rebajado y enlace de compra.
+  * *Consulta de catálogo (`/catalogo`):* Lista de categorías principales de la tienda deportiva.
+  * *Navegación / Escape:* Respuestas directas a comandos estándar (`/start`, `/catalogo`, `/ofertas`, `/cancelar`).
+* **¿Cuál es su edad, ocupación, intereses, nivel de experiencia con tecnología?:** Usuarios de 16 a 50 años, estudiantes, deportistas o entusiastas del acondicionamiento físico, familiarizados con apps de mensajería instantánea.
+* **¿Cuáles son los escenarios alternativos y manejo de fricción?:**
+  * *Sin promociones vigentes:* El bot notifica la ausencia de descuentos activos y sugiere explorar el catálogo general.
+  * *Sin coincidencias:* Notifica que no hay existencias del término buscado y sugiere revisar las categorías disponibles.
+  * *Falla técnica / Timeout de API:* Presenta un mensaje comprensible ("No fue posible conectar con el catálogo en este momento") y permite reintentar sin romper el flujo.
+  * *Bucle de entrada inválida:* Se establece un límite de 3 intentos para términos no válidos; superado el límite, se cancela la búsqueda y se regresa al menú principal.
+  * *Interrupción global:* El usuario puede escribir `/cancelar` en cualquier momento para reiniciar el estado de la conversación y regresar al inicio.
+* **¿UI, Accesibilidad?:** Mensajes concisos orientados a pantallas móviles, uso de viñetas, saltos de línea legibles y enlaces limpios sin sobrecargar la interfaz.
+* **¿Cómo haré para validar mi prototipo?:** Simulación de turnos con técnica de Mago de Oz, evaluación cruzada entre pares y contrastación contra las heurísticas de cooperación de Grice.
+* **¿Privacidad?:** Únicamente se gestiona el ID de chat de Telegram para mantener la sesión y los términos de búsqueda en memoria volátil; no se recolectan contraseñas, datos personales ni métodos de pago.
 
 ---
 
 ## 2. Inventario de Intenciones
 
-| Intención | Ejemplo de enunciado | Frecuencia | Prioridad | Dato / API |
+| Intención | Enunciados de ejemplo | Frecuencia | Prioridad | Manejo de Datos / API |
 | :--- | :--- | :--- | :--- | :--- |
-| `saludo_inicio` | `/start`, `hola`, `buenas tardes` | Alta | 1 | Ninguno |
-| `consultar_catalogo` | `ver productos`, `/catalogo`, `¿qué venden?` | Alta | 1 | API de catálogo (Categorías/Productos) |
-| `consultar_ofertas` | `/ofertas`, `descuentos deportivos`, `promociones de hoy` | Alta | 1 | API de catálogo (filtro on_sale) |
-| `buscar_producto` | `¿tienen [producto]?`, `precio de [producto]`, `buscar [producto]` | Alta | 1 | Término de búsqueda / API de catálogo |
-| `ayuda_menu` | `/help`, `ayuda`, `¿cómo funciona?` | Media | 2 | Ninguno |
-| `cancelar_accion` | `/cancelar`, `salir`, `olvídalo` | Baja | 2 | Ninguno |
+| `saludo_inicio` | `/start`, `hola`, `buenos días` | Alta | 1 | Ninguno |
+| `consultar_catalogo` | `/catalogo`, `ver catálogo`, `¿qué departamentos tienen?` | Alta | 1 | API WooCommerce: `/products/categories` |
+| `consultar_ofertas` | `/ofertas`, `descuentos de hoy`, `promociones deportivas` | Alta | 1 | API WooCommerce: `/products?on_sale=true` |
+| `buscar_producto` | `precio de guantes de boxeo`, `¿tienen balones?`, `zapatillas running` | Alta | 1 | Slot filling (`término`) $\rightarrow$ API WooCommerce: `/products?search=...` |
+| `cancelar_accion` | `/cancelar`, `salir`, `olvídalo` | Media | 1 | Interrupción global (reseteo de estado) |
+| `ayuda_menu` | `/help`, `ayuda`, `¿qué comandos hay?` | Baja | 2 | Ninguno |
 
 ---
 
-## 3. Diálogo de Muestra (Camino Feliz)
+## 3. Diálogo de Muestra (Camino Feliz y Desambiguación)
 
 **Usuario:** `/start`
 
-**Bot:** ¡Hola! 👋 Soy tu asistente en la tienda deportiva.\nEscribe el nombre de un producto, o usa /ofertas para descuentos y /catalogo para ver categorías.
+**Bot:** ¡Hola! 👋 Soy tu asistente en la tienda deportiva. Escribe el nombre de un producto, o usa `/ofertas` para descuentos y `/catalogo` para ver categorías.
 
 **Usuario:** `/ofertas`
 
 **Bot:** 🔥 **Promociones Deportivas Actuales:**
 
-1. **[producto]**
-   * **Categoría:** [categoría]
-   * **Precio de oferta:** $0.00 USD *(Antes: $0.00 USD)*
-   * **Disponibilidad:** En existencia
-   * **Enlace:** `https://gt22004.duckdns.org/producto/[producto]`
+1. **Zapatillas Running Speed Pro**
+   * **Categoría:** Calzado
+   * **Precio de oferta:** $59.99 USD *(Antes: $85.00 USD)*
+   * **Disponibilidad:** En existencia
+   * **Enlace:** `https://gt22004.duckdns.org/producto/zapatillas-running-speed-pro`
 
-2. **[producto]**
-   * **Categoría:** [categoría]
-   * **Precio de oferta:** $0.00 USD *(Antes: $0.00 USD)*
-   * **Disponibilidad:** En existencia
-   * **Enlace:** `https://gt22004.duckdns.org/producto/[producto]`
+2. **Set de Mancuernas Neopreno 15 lb**
+   * **Categoría:** Fitness y Fuerza
+   * **Precio de oferta:** $28.50 USD *(Antes: $35.00 USD)*
+   * **Disponibilidad:** En existencia
+   * **Enlace:** `https://gt22004.duckdns.org/producto/set-mancuernas-15lb`
 
-¿Deseas consultar detalles de algún [producto] o revisar una [categoría] deportiva?
+¿Deseas consultar detalles de algún producto o escribir `/catalogo` para revisar departamentos?
 
-**Usuario:** ¿Tienen disponible [producto]?
+**Usuario:** ¿Tienen guantes?
+
+**Bot:** Encontré más de un artículo para tu búsqueda. ¿Cuál de ellos deseas consultar?
+1. Guantes de Boxeo Pro 14 oz ($34.99 USD)
+2. Guantes de Ciclismo Gel Antideslizante ($18.00 USD)
+3. Guantes para Gimnasio con Muñequera ($14.50 USD)
+
+Escribe el número de la opción o el nombre exacto (o `/cancelar` para salir).
+
+**Usuario:** 1
 
 **Bot:** Sí, tenemos disponible el artículo.
-* **Producto:** [producto]
-* **Categoría:** [categoría]
-* **Precio:** $0.00 USD
-* **Disponibilidad:** En existencia
-* **Enlace directo:** `https://gt22004.duckdns.org/producto/[producto]`
+* **Producto:** Guantes de Boxeo Pro 14 oz
+* **Categoría:** Boxeo y Artes Marciales
+* **Precio:** $34.99 USD
+* **Disponibilidad:** En existencia (12 unidades)
+* **Enlace directo:** `https://gt22004.duckdns.org/producto/guantes-boxeo-pro`
 
 ¿Deseas buscar otro artículo o consultar alguna otra sección?
 
@@ -87,68 +98,88 @@
 
 **Bot:** Con gusto. Si necesitas consultar algo más adelante, escribe `/start`, `/catalogo` o `/ofertas`. ¡Mucho éxito en tu entrenamiento!
 
-
 ---
 
 ## 4. Diagrama de Flujo Conversacional
 
 ```mermaid
 flowchart TD
-    %% Estilos visuales
-    classDef startEnd fill:#1e293b,stroke:#0ea5e9,stroke-width:2px,color:#fff;
-    classDef apiCall fill:#0f766e,stroke:#14b8a6,stroke-width:2px,color:#fff;
-    classDef decision fill:#334155,stroke:#94a3b8,stroke-width:2px,color:#fff;
-    classDef errorState fill:#7f1d1d,stroke:#ef4444,stroke-width:1px,color:#fff;
-    classDef response fill:#1e293b,stroke:#64748b,stroke-width:1px,color:#fff;
+    %% Estilos visuales
+    classDef startEnd fill:#1e293b,stroke:#0ea5e9,stroke-width:2px,color:#fff;
+    classDef apiCall fill:#0f766e,stroke:#14b8a6,stroke-width:2px,color:#fff;
+    classDef decision fill:#334155,stroke:#94a3b8,stroke-width:2px,color:#fff;
+    classDef errorState fill:#7f1d1d,stroke:#ef4444,stroke-width:1px,color:#fff;
+    classDef response fill:#1e293b,stroke:#64748b,stroke-width:1px,color:#fff;
 
-    subgraph INICIO["Entrada y Menú"]
-        Inicio([Inicio: Usuario escribe /start]):::startEnd --> Bienvenida["Bot muestra saludo y opciones"]:::response
-        Bienvenida --> EntradaUsuario[/"Usuario ingresa mensaje o comando"/]
-        EntradaUsuario --> DetectaIntencion{¿Qué intención detecta?}:::decision
-    end
+    subgraph INICIO["Entrada y Menú Principal"]
+        Inicio([Inicio: Usuario escribe /start]):::startEnd --> Bienvenida["Bot muestra saludo conciso y comandos"]:::response
+        Bienvenida --> EsperaEntrada[/"Captura de mensaje del usuario"/]
+        EsperaEntrada --> InterceptaCancela{¿Es /cancelar?}:::decision
+        InterceptaCancela -- Sí --> ReseteoSesion["Limpiar sesión y volver a inicio"]:::response --> Bienvenida
+        InterceptaCancela -- No --> DetectaIntencion{¿Qué intención detecta?}:::decision
+    end
 
-    subgraph OFERTAS["Flujo: Ofertas y Promociones"]
-        DetectaIntencion -- "/ofertas" --> LlamaAPIOfertas["Consultar ofertas vía API"]:::apiCall
-        LlamaAPIOfertas --> HayOfertas{¿Hay ofertas?}:::decision
-        HayOfertas -- Sí --> MuestraOfertas["Listar [producto] con precio rebajado"]:::response
-        HayOfertas -- No --> SinOfertas["Informar: Sin ofertas vigentes"]:::errorState
-    end
+    subgraph OFERTAS["Flujo: Ofertas y Promociones"]
+        DetectaIntencion -- "/ofertas" --> LlamaAPIOfertas["Llamar API: /products?on_sale=true"]:::apiCall
+        LlamaAPIOfertas --> RespAPIOfertas{¿API responde OK?}:::decision
+        RespAPIOfertas -- Fallo / Timeout --> ErrorAPIOfertas["Informar: Error técnico temporal"]:::errorState --> FinTurno
+        RespAPIOfertas -- 200 OK --> HayOfertas{¿Hay ofertas?}:::decision
+        HayOfertas -- Sí --> MuestraOfertas["Listar productos con rebaja"]:::response --> FinTurno
+        HayOfertas -- No --> SinOfertas["Informar: Sin ofertas activas"]:::response --> FinTurno
+    end
 
-    subgraph CATALOGO["Flujo: Catálogo"]
-        DetectaIntencion -- "/catalogo" --> LlamaAPICat["Consultar categorías vía API"]:::apiCall
-        LlamaAPICat --> MuestraCategorias["Listar [categoría] disponibles"]:::response
-    end
+    subgraph CATALOGO["Flujo: Catálogo de Categorías"]
+        DetectaIntencion -- "/catalogo" --> LlamaAPICat["Llamar API: /products/categories"]:::apiCall
+        LlamaAPICat --> RespAPICat{¿API responde OK?}:::decision
+        RespAPICat -- Fallo / Timeout --> ErrorAPICat["Informar: Error técnico temporal"]:::errorState --> FinTurno
+        RespAPICat -- 200 OK --> MuestraCategorias["Listar categorías disponibles"]:::response --> FinTurno
+    end
 
-    subgraph BUSQUEDA["Flujo: Búsqueda de Producto"]
-        DetectaIntencion -- "Búsqueda de producto" --> ExtraeTermino["Extraer nombre de [producto]"]:::response
-        ExtraeTermino --> ValidaTermino{¿Texto válido?}:::decision
+    subgraph BUSQUEDA["Flujo: Búsqueda con Slot Filling y Desambiguación"]
+        DetectaIntencion -- "Búsqueda" --> TieneSlot{¿Incluyó término?}:::decision
+        TieneSlot -- Sí --> ValidaTermino
+        TieneSlot -- No --> InitContador["Inicializar contador_errores = 0"]:::response --> PideTermino["Solicitar nombre del producto"]:::response
+        
+        PideTermino --> EsperaTermino[/"Usuario escribe término"/]
+        EsperaTermino --> CancelaBusqueda{¿Es /cancelar?}:::decision
+        CancelaBusqueda -- Sí --> ReseteoSesion
+        CancelaBusqueda -- No --> ValidaTermino{¿Término válido?}:::decision
 
-        ValidaTermino -- "No (vacío)" --> PideTermino["Solicitar término válido"]:::errorState
-        PideTermino -- "Reintenta" --> ExtraeTermino
+        ValidaTermino -- "Inválido (vacío)" --> SumaError["contador_errores = contador_errores + 1"]:::response
+        SumaError --> EvaluaLimite{¿contador >= 3?}:::decision
+        EvaluaLimite -- Sí --> LimiteAlcanzado["Aviso: Límite de intentos superado"]:::errorState --> ReseteoSesion
+        EvaluaLimite -- No --> Reintento["Pedir término descriptivo (Ej: 'balón')"]:::errorState --> EsperaTermino
 
-        ValidaTermino -- "Sí" --> ConsultaAPI["Consultar API con [producto]"]:::apiCall
-        ConsultaAPI --> Hallado{¿Coincidencias?}:::decision
+        ValidaTermino -- "Válido" --> LlamaAPIBusqueda["Llamar API: /products?search=termino"]:::apiCall
+        LlamaAPIBusqueda --> RespAPIBusqueda{¿API responde OK?}:::decision
+        RespAPIBusqueda -- Fallo / Timeout --> ErrorAPIBusqueda["Informar: Error técnico temporal"]:::errorState --> FinTurno
+        RespAPIBusqueda -- 200 OK --> Hallado{¿Coincidencias?}:::decision
 
-        Hallado -- No --> SinResultados["Notificar producto no encontrado"]:::errorState
-        SinResultados --> SugiereCat["Sugerir ver [categoría]"]:::response
+        Hallado -- No --> SinResultados["Notificar producto no disponible"]:::errorState
+        SinResultados --> SugiereCat["Sugerir revisar /catalogo"]:::response --> FinTurno
 
-        Hallado -- Sí --> ValidaStock{¿Hay stock?}:::decision
-        ValidaStock -- Sí --> MuestraDisponible["Mostrar [producto], precio y stock"]:::response
-        ValidaStock -- No --> MuestraAgotado["Mostrar [producto] como Agotado"]:::errorState
-    end
+        Hallado -- Sí --> CantidadCoincidencias{¿Cuántos resultados?}:::decision
+        
+        CantidadCoincidencias -- "Múltiples (>1)" --> MuestraLista["Mostrar opciones numeradas"]:::response
+        MuestraLista --> EsperaSeleccion[/"Usuario elige número o producto"/]
+        EsperaSeleccion --> CancelaDesamb{¿Es /cancelar?}:::decision
+        CancelaDesamb -- Sí --> ReseteoSesion
+        CancelaDesamb -- No --> ValidaStock
 
-    subgraph AYUDA["Flujo: Ayuda y Fallback"]
-        DetectaIntencion -- "Ayuda o Desconocido" --> MuestraAyuda["Desplegar comandos: /start, /catalogo, /ofertas"]:::response
-    end
+        CantidadCoincidencias -- "Único (=1)" --> ValidaStock{¿Hay stock?}:::decision
+        ValidaStock -- Sí --> MuestraDisponible["Mostrar producto, precio y stock"]:::response --> FinTurno
+        ValidaStock -- No --> MuestraAgotado["Mostrar producto indicando 'Agotado'"]:::errorState --> FinTurno
+    end
 
-    subgraph CIERRE["Cierre y Continuación"]
-        MuestraOfertas & SinOfertas & MuestraCategorias & SugiereCat & MuestraDisponible & MuestraAgotado & MuestraAyuda --> FinTurno["Ofrecer realizar otra consulta"]:::response
-        PideTermino -- "/cancelar" --> FinTurno
-        
-        FinTurno --> Continuar{¿Continuar?}:::decision
-        Continuar -- Sí --> Bienvenida
-        Continuar -- "No / /cancelar" --> Fin([Fin de la sesión]):::startEnd
-    end
+    subgraph AYUDA["Flujo: Ayuda y Fallback"]
+        DetectaIntencion -- "Desconocido o /help" --> MuestraAyuda["Desplegar comandos: /start, /catalogo, /ofertas"]:::response --> FinTurno
+    end
+
+    subgraph CIERRE["Cierre y Reenganche"]
+        FinTurno["Preguntar: ¿Deseas realizar otra consulta?"]:::response --> Continuar{¿Usuario continúa?}:::decision
+        Continuar -- "Sí o nueva consulta" --> EsperaEntrada
+        Continuar -- "No / /cancelar" --> Despedida([Fin de la sesión]):::startEnd
+    end
 ```
 ---
 # Observaciones - MC21105 - David Alexander Méndez Cuéllar
