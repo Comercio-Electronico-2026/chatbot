@@ -157,3 +157,22 @@ flowchart TD
     PreguntaCierre --> FinCiclo([Continúa sesión o usuario finaliza])
     
     CancelGlobal[Bot: Operación cancelada] --> ResetState[Limpiar estado temporal de sesión] --> Start
+```
+---
+
+## 5.Actividad 4 - Revisión entre Pares Evaluado por : OT18005
+**1. Alcance y descubribilidad:** Parcial.
+* **Evidencia:** El saludo inicial explica qué hace el bot, pero no delimita qué cosas no hace. Además, introduce una pregunta de confirmación innecesaria "¿Te gustaría buscar opciones disponibles ahora?" que no está modelada en el nodo Saludo del diagrama. Como sugerencia reemplaza el mensaje de bienvenida por uno directo con opciones en botones.
+
+**2. Grice en el guion (Cantidad, relación, manera):** Parcial.
+* **Evidencia:** En el cierre, tras enviar el contacto, el bot pregunta: "¿Deseas hacer otra búsqueda o consultar otro alojamiento?", pero en el diagrama el nodo MuestraContacto conduce a PreguntaCierre que dice: "¿Deseas el contacto o hacer otra consulta?", lo cual resulta redundante porque el enlace de WhatsApp ya fue enviado. Como sugerencia desacopla PreguntaCierre en el diagrama creando un nodo específico para el cierre post-contacto
+
+**3. Grice — Calidad y APIs:** Parcial.
+* **Evidencia:** En la lista de intenciones, el ejemplo de búsqueda es: "Busco cuarto para señoritas cerca de la UES por menos de $150", sin embargo, el diagrama de flujo no contempla el relleno de ranuras: obliga rígidamente a pasar por PideZona PideGenero PidePrecio uno a uno. Recomiendo agregar en el diagrama una decisión previa tras el ingreso de zona.
+
+* 
+**4. Manejo de errores (Guion con fricción):** No resuelto.
+* **Evidencia:** Los nodos ErrorGenero, ErrorPrecio y ErrorID solo repiten la solicitud en bucle infinito hacia el nodo anterior. Mi sugerencia es incorporar un contador de reintentos en el diagrama para los filtros.
+
+**5. Reglas de producto:** Parcial.
+* **Evidencia:** El nodo de escape CheckCancel1 está cableado exclusivamente después de InpZona. Si el usuario escribe "cancelar" al solicitarle género o presupuesto, el bot lo toma como texto inválido y dispara ErrorGenero o ErrorPrecio en lugar de abortar. Sugiero reemplazar las comprobaciones locales de cancelación por una subrutina o manejador global en el diagrama.
