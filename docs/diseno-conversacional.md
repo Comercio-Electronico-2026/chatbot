@@ -143,12 +143,6 @@ flowchart TD
     S[Bot: pregunta si necesita algo mas] --> B
 ```
 
-**Notas de diseño:**
-- `ESC` (hablar con un humano) es un único punto de escalamiento, alcanzable desde el menú principal, desde el límite de intentos con el teléfono, y desde una búsqueda de cita sin resultados. No asume un solo motivo: el agente humano ve el contexto y resuelve lo que corresponda (precio especial, queja, teléfono que no valida, etc.), en vez de que el bot solo entregue un número de contacto.
-- `TC` (cambio de tema) se reutiliza desde todos los pasos de agendamiento; "continuar" retoma el mismo paso con el estado guardado, "cambiar de tema" regresa al menú.
-- Cancelar y reprogramar exigen confirmación explícita en un turno separado del resumen, igual que agendar.
-- Si hay varias citas activas con el mismo teléfono, el bot deja elegir cuál antes de actuar.
-
 ---
 
 ## 4. Diálogo de muestra — agendar cita (camino feliz)
