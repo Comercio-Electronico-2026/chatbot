@@ -1,10 +1,34 @@
 <?php
 
-$ROOT = dirname(__DIR__);
+/*
+ * NutriGuía - Laboratorio 5b
+ * Carnet: JO20004
+ *
+ * Funciones:
+ * - /start y saludos
+ * - /ayuda
+ * - /volver
+ * - /cancelar
+ * - Comparar nutrientes
+ * - Consultar fuentes naturales
+ * - Consultar función de un nutriente
+ * - Solicitar asesoría
+ * - Máximo 3 intentos
+ * - Slot filling
+ * - Reutilización de datos
+ * - Consultas fuera de alcance
+ * - Logs
+ * - API REST Open-Meteo
+ * - Long polling
+ * - Webhook
+ */
+
 
 /* =========================================================
    CONFIGURACIÓN
    ========================================================= */
+
+$ROOT = dirname(__DIR__);
 
 $env = parse_ini_file($ROOT . '/.env');
 
@@ -25,7 +49,7 @@ $LOG_FILE   = $ROOT . '/logs/bot.log';
 
 
 /* =========================================================
-   CREAR DIRECTORIOS SI NO EXISTEN
+   DIRECTORIOS
    ========================================================= */
 
 if (!is_dir($ROOT . '/data')) {
@@ -38,19 +62,44 @@ if (!is_dir($ROOT . '/logs')) {
 
 
 /* =========================================================
-   DATOS NUTRICIONALES TEMPORALES
-   =========================================================
-   Posteriormente esta información podrá complementarse
-   mediante la integración REST de la Actividad 1.
+   DATOS NUTRICIONALES
    ========================================================= */
 
 $nutrientes = [
 
+    'vitamina b' => [
+        'nombre' => 'Vitaminas del complejo B',
+
+        'aliases' => [
+            'vitamina b',
+            'complejo b',
+            'vitaminas b'
+        ],
+
+        'funcion' =>
+            'El complejo B agrupa varias vitaminas que participan '
+            . 'en diferentes procesos del metabolismo y del '
+            . 'funcionamiento normal del organismo.',
+
+        'fuentes' => [
+            'Cereales integrales',
+            'Legumbres',
+            'Carnes'
+        ]
+    ],
+
     'vitamina b12' => [
         'nombre' => 'Vitamina B12',
+
+        'aliases' => [
+            'vitamina b12',
+            'b12',
+            'cobalamina'
+        ],
+
         'funcion' =>
-            'Participa en la formación normal de glóbulos rojos y '
-            . 'en el funcionamiento normal del sistema nervioso.',
+            'Participa en la formación normal de glóbulos rojos '
+            . 'y en el funcionamiento normal del sistema nervioso.',
 
         'fuentes' => [
             'Pescados',
@@ -61,6 +110,11 @@ $nutrientes = [
 
     'vitamina c' => [
         'nombre' => 'Vitamina C',
+
+        'aliases' => [
+            'vitamina c'
+        ],
+
         'funcion' =>
             'Contribuye al funcionamiento normal del sistema inmunitario '
             . 'y participa en la formación de colágeno.',
@@ -74,6 +128,11 @@ $nutrientes = [
 
     'vitamina d' => [
         'nombre' => 'Vitamina D',
+
+        'aliases' => [
+            'vitamina d'
+        ],
+
         'funcion' =>
             'Participa en la absorción y utilización normal '
             . 'del calcio y del fósforo.',
@@ -87,6 +146,11 @@ $nutrientes = [
 
     'vitamina k' => [
         'nombre' => 'Vitamina K',
+
+        'aliases' => [
+            'vitamina k'
+        ],
+
         'funcion' =>
             'Participa en el proceso normal de coagulación de la sangre.',
 
@@ -99,6 +163,11 @@ $nutrientes = [
 
     'hierro' => [
         'nombre' => 'Hierro',
+
+        'aliases' => [
+            'hierro'
+        ],
+
         'funcion' =>
             'Participa en la formación normal de hemoglobina '
             . 'y en el transporte de oxígeno.',
@@ -112,6 +181,11 @@ $nutrientes = [
 
     'calcio' => [
         'nombre' => 'Calcio',
+
+        'aliases' => [
+            'calcio'
+        ],
+
         'funcion' =>
             'Contribuye al mantenimiento normal de huesos y dientes.',
 
@@ -125,7 +199,7 @@ $nutrientes = [
 
 
 /* =========================================================
-   ESTADOS DE CONVERSACIÓN
+   ESTADOS
    ========================================================= */
 
 function nuevoEstado()
@@ -133,10 +207,8 @@ function nuevoEstado()
     return [
         'estado'      => 'menu',
         'intentos'    => 0,
-
         'nutriente_1' => null,
         'nutriente_2' => null,
-
         'nombre'      => null,
         'contacto'    => null
     ];
@@ -197,7 +269,7 @@ function logBot($tipo, $mensaje)
 
 
 /* =========================================================
-   TELEGRAM API
+   TELEGRAM
    ========================================================= */
 
 function telegram($metodo, $datos = [])
@@ -207,11 +279,9 @@ function telegram($metodo, $datos = [])
     $curl = curl_init($API . $metodo);
 
     curl_setopt_array($curl, [
-
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST           => true,
         CURLOPT_POSTFIELDS     => $datos,
-
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_TIMEOUT        => 35
     ]);
@@ -230,7 +300,22 @@ function telegram($metodo, $datos = [])
         return [];
     }
 
+    $codigo = curl_getinfo(
+        $curl,
+        CURLINFO_HTTP_CODE
+    );
+
     curl_close($curl);
+
+    if ($codigo < 200 || $codigo >= 300) {
+
+        logBot(
+            'ERROR',
+            "Telegram respondió HTTP {$codigo}"
+        );
+
+        return [];
+    }
 
     $json = json_decode($respuesta, true);
 
@@ -239,13 +324,12 @@ function telegram($metodo, $datos = [])
 
 
 /* =========================================================
-   MENÚ DE TELEGRAM
+   TECLADOS
    ========================================================= */
 
 function tecladoPrincipal()
 {
     return json_encode([
-
         'keyboard' => [
 
             [
@@ -255,16 +339,41 @@ function tecladoPrincipal()
 
             [
                 ['text' => 'Función de un nutriente'],
-                ['text' => 'Agendar asesoría']
+                ['text' => 'Consultar clima']
             ],
 
             [
-                ['text' => 'Ayuda'],
+                ['text' => 'Agendar asesoría'],
+                ['text' => 'Ayuda']
+            ],
+
+            [
+                ['text' => 'Cancelar']
+            ],
+        ],
+
+        'resize_keyboard' => true
+    ]);
+}
+
+
+function tecladoSiNo()
+{
+    return json_encode([
+        'keyboard' => [
+
+            [
+                ['text' => 'Sí'],
+                ['text' => 'No']
+            ],
+
+            [
                 ['text' => 'Cancelar']
             ]
         ],
 
-        'resize_keyboard' => true
+        'resize_keyboard' => true,
+        'one_time_keyboard' => true
     ]);
 }
 
@@ -273,8 +382,13 @@ function tecladoPrincipal()
    ENVIAR MENSAJES
    ========================================================= */
 
-function enviarMensaje($chatId, $texto, $mostrarMenu = false)
-{
+function enviarMensaje(
+    $chatId,
+    $texto,
+    $menu = false,
+    $siNo = false
+) {
+
     logBot('OUT', $texto);
 
     $datos = [
@@ -282,24 +396,32 @@ function enviarMensaje($chatId, $texto, $mostrarMenu = false)
         'text'    => $texto
     ];
 
-    if ($mostrarMenu) {
+    if ($menu) {
         $datos['reply_markup'] = tecladoPrincipal();
     }
 
-    telegram('sendMessage', $datos);
+    if ($siNo) {
+        $datos['reply_markup'] = tecladoSiNo();
+    }
+
+    telegram(
+        'sendMessage',
+        $datos
+    );
 }
 
 
 /* =========================================================
-   NORMALIZACIÓN DE TEXTO
+   TEXTO
    ========================================================= */
 
 function normalizar($texto)
 {
-    $texto = mb_strtolower(trim($texto));
+    $texto = mb_strtolower(
+        trim($texto)
+    );
 
     return strtr($texto, [
-
         'á' => 'a',
         'é' => 'e',
         'í' => 'i',
@@ -318,33 +440,45 @@ function detectarNutrientes($texto)
 {
     global $nutrientes;
 
-    $textoNormal = normalizar($texto);
+    $texto = normalizar($texto);
 
     $encontrados = [];
 
     foreach ($nutrientes as $clave => $datos) {
 
-        $claveNormal = normalizar($clave);
+        foreach ($datos['aliases'] as $alias) {
 
-        if (str_contains($textoNormal, $claveNormal)) {
-            $encontrados[] = $clave;
+            $alias = normalizar($alias);
+
+            $patron =
+                '~(?<![\pL\pN])'
+                . preg_quote($alias, '~')
+                . '(?![\pL\pN])~u';
+
+            if (preg_match($patron, $texto)) {
+
+                $encontrados[] = $clave;
+
+                break;
+            }
         }
     }
 
-    return array_values(array_unique($encontrados));
+    return array_values(
+        array_unique($encontrados)
+    );
 }
 
 
 /* =========================================================
-   DETECTAR CONSULTAS FUERA DE ALCANCE
+   FUERA DE ALCANCE
    ========================================================= */
 
 function esConsultaMedicaFueraDeAlcance($texto)
 {
     $texto = normalizar($texto);
 
-    $palabras = [
-
+    $terminos = [
         'medicamento',
         'medicina',
         'tratamiento',
@@ -354,12 +488,15 @@ function esConsultaMedicaFueraDeAlcance($texto)
         'receta',
         'enfermedad',
         'sintoma',
-        'sintomas'
+        'sintomas',
+        'cuanto debo tomar',
+        'cuantas pastillas',
+        'que pastilla'
     ];
 
-    foreach ($palabras as $palabra) {
+    foreach ($terminos as $termino) {
 
-        if (str_contains($texto, $palabra)) {
+        if (str_contains($texto, $termino)) {
             return true;
         }
     }
@@ -369,13 +506,12 @@ function esConsultaMedicaFueraDeAlcance($texto)
 
 
 /* =========================================================
-   MENSAJE PRINCIPAL
+   MENÚ
    ========================================================= */
 
 function mostrarMenu($chatId)
 {
     enviarMensaje(
-
         $chatId,
 
         "¡Hola! Soy NutriGuía 🌿\n\n"
@@ -385,11 +521,16 @@ function mostrarMenu($chatId)
         . "1. Comparar vitaminas y nutrientes.\n"
         . "2. Conocer fuentes naturales.\n"
         . "3. Consultar para qué sirve un nutriente.\n"
-        . "4. Solicitar una asesoría nutricional.\n\n"
+        . "4. Consultar la temperatura de una ciudad.\n\n"
+        . "5. Solicitar una asesoria nutricional.\n\n"
 
-        . "Elige una opción o escribe tu consulta directamente.\n\n"
+        . "Elige una opción del menú o escribe tu consulta directamente.\n\n"
 
-        . "Puedes usar /ayuda, /volver o /cancelar en cualquier momento.",
+        . "También puedes usar:\n"
+        . "/clima San Salvador\n"
+        . "/ayuda\n"
+        . "/volver\n"
+        . "/cancelar",
 
         true
     );
@@ -397,7 +538,7 @@ function mostrarMenu($chatId)
 
 
 /* =========================================================
-   RESPUESTA: FUENTES NATURALES
+   FUENTES
    ========================================================= */
 
 function responderFuentes($chatId, $nutriente)
@@ -408,7 +549,8 @@ function responderFuentes($chatId, $nutriente)
 
     $fuentes = $datos['fuentes'];
 
-    $mensaje =
+    enviarMensaje(
+        $chatId,
 
         "Estas son algunas fuentes de "
         . $datos['nombre']
@@ -421,14 +563,16 @@ function responderFuentes($chatId, $nutriente)
         . "Esta información es educativa y no sustituye "
         . "una recomendación nutricional personalizada.\n\n"
 
-        . "¿Quieres realizar otra consulta?";
+        . "¿Quieres realizar otra consulta?",
 
-    enviarMensaje($chatId, $mensaje);
+        false,
+        true
+    );
 }
 
 
 /* =========================================================
-   RESPUESTA: FUNCIÓN
+   FUNCIÓN
    ========================================================= */
 
 function responderFuncion($chatId, $nutriente)
@@ -438,7 +582,6 @@ function responderFuncion($chatId, $nutriente)
     $datos = $nutrientes[$nutriente];
 
     enviarMensaje(
-
         $chatId,
 
         $datos['nombre']
@@ -448,23 +591,31 @@ function responderFuncion($chatId, $nutriente)
 
         . "\n\nEsta información tiene fines educativos."
 
-        . "\n\n¿Quieres realizar otra consulta?"
+        . "\n\n¿Quieres realizar otra consulta?",
+
+        false,
+        true
     );
 }
 
 
 /* =========================================================
-   RESPUESTA: COMPARACIÓN
+   COMPARACIÓN
    ========================================================= */
 
-function responderComparacion($chatId, $n1, $n2)
-{
+function responderComparacion(
+    $chatId,
+    $n1,
+    $n2
+) {
+
     global $nutrientes;
 
     $dato1 = $nutrientes[$n1];
     $dato2 = $nutrientes[$n2];
 
-    $mensaje =
+    enviarMensaje(
+        $chatId,
 
         "Comparación entre "
         . $dato1['nombre']
@@ -481,14 +632,16 @@ function responderComparacion($chatId, $n1, $n2)
         . ":\n"
         . $dato2['funcion']
 
-        . "\n\n¿Quieres realizar otra consulta?";
+        . "\n\n¿Quieres realizar otra consulta?",
 
-    enviarMensaje($chatId, $mensaje);
+        false,
+        true
+    );
 }
 
 
 /* =========================================================
-   PREPARAR PREGUNTA DE CONTINUACIÓN
+   ESPERAR CONTINUACIÓN
    ========================================================= */
 
 function esperarContinuacion(&$estado)
@@ -500,32 +653,35 @@ function esperarContinuacion(&$estado)
     $estado['nutriente_1'] = null;
     $estado['nutriente_2'] = null;
 
-    $estado['nombre']   = null;
+    $estado['nombre'] = null;
     $estado['contacto'] = null;
 }
 
 
 /* =========================================================
-   MANEJO DE ERRORES
+   ERRORES
    ========================================================= */
 
-function errorIntento($chatId, &$estado, $mensaje)
-{
+function errorIntento(
+    $chatId,
+    &$estado,
+    $mensaje
+) {
+
     global $HUMAN_CONTACT;
 
     $estado['intentos']++;
 
-    /* Primer intento */
 
     if ($estado['intentos'] === 1) {
 
         enviarMensaje(
-
             $chatId,
 
             $mensaje
 
-            . "\n\nPrueba nuevamente siguiendo el ejemplo mostrado."
+            . "\n\nPrueba nuevamente siguiendo "
+            . "el ejemplo mostrado."
 
             . "\n\nIntento 1 de 3."
         );
@@ -534,15 +690,13 @@ function errorIntento($chatId, &$estado, $mensaje)
     }
 
 
-    /* Segundo intento */
-
     if ($estado['intentos'] === 2) {
 
         enviarMensaje(
-
             $chatId,
 
-            "Todavía no pude identificar correctamente el dato.\n\n"
+            "Todavía no pude identificar correctamente "
+            . "el dato.\n\n"
 
             . "Puedes intentarlo nuevamente, usar /ayuda "
             . "o cancelar con /cancelar.\n\n"
@@ -554,43 +708,302 @@ function errorIntento($chatId, &$estado, $mensaje)
     }
 
 
-    /* Tercer intento */
-
     enviarMensaje(
-
         $chatId,
 
-        "No pude completar la consulta después de tres intentos.\n\n"
+        "No pude completar la consulta después "
+        . "de tres intentos.\n\n"
 
-        . "Puedes volver al menú o solicitar una asesoría "
-        . "con un profesional de nutrición.\n\n"
+        . "Puedes volver al menú o solicitar "
+        . "una asesoría con un profesional "
+        . "de nutrición.\n\n"
 
         . "Contacto disponible: {$HUMAN_CONTACT}",
 
         true
     );
 
+
     $estado = nuevoEstado();
 }
 
 
 /* =========================================================
-   INICIAR FLUJO DE ASESORÍA
+   ASESORÍA
    ========================================================= */
 
-function iniciarAsesoria($chatId, &$estado)
-{
+function iniciarAsesoria(
+    $chatId,
+    &$estado
+) {
+
     $estado = nuevoEstado();
 
-    $estado['estado'] = 'esperando_nombre_asesoria';
+    $estado['estado'] =
+        'esperando_nombre_asesoria';
+
 
     enviarMensaje(
-
         $chatId,
 
-        "Claro. Para solicitar una asesoría necesito algunos datos.\n\n"
+        "Claro. Para solicitar una asesoría "
+        . "necesito algunos datos.\n\n"
 
         . "Primero, ¿cuál es tu nombre?"
+    );
+}
+
+
+/* =========================================================
+   API REST - HTTP GET
+   ========================================================= */
+
+function httpGetJson($url)
+{
+    $curl = curl_init($url);
+
+    curl_setopt_array(
+        $curl,
+        [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 8,
+            CURLOPT_TIMEOUT        => 12,
+            CURLOPT_FOLLOWLOCATION => true,
+
+            CURLOPT_HTTPHEADER => [
+                'Accept: application/json'
+            ]
+        ]
+    );
+
+    $respuesta = curl_exec($curl);
+
+
+    if ($respuesta === false) {
+
+        logBot(
+            'ERROR',
+            'API REST: '
+            . curl_error($curl)
+        );
+
+        curl_close($curl);
+
+        return null;
+    }
+
+
+    $codigo =
+        curl_getinfo(
+            $curl,
+            CURLINFO_HTTP_CODE
+        );
+
+
+    curl_close($curl);
+
+
+    if (
+        $codigo < 200
+        ||
+        $codigo >= 300
+    ) {
+
+        logBot(
+            'ERROR',
+            "API REST respondió HTTP {$codigo}"
+        );
+
+        return null;
+    }
+
+
+    $datos =
+        json_decode(
+            $respuesta,
+            true
+        );
+
+
+    if (!is_array($datos)) {
+
+        logBot(
+            'ERROR',
+            'La API REST devolvió JSON inválido'
+        );
+
+        return null;
+    }
+
+
+    return $datos;
+}
+
+
+/* =========================================================
+   API REST - OPEN-METEO
+   ========================================================= */
+
+function consultarClima($ciudad)
+{
+    /*
+     * PASO 1:
+     * Convertir nombre de ciudad
+     * en latitud y longitud.
+     */
+
+    $urlGeocoding =
+
+        'https://geocoding-api.open-meteo.com/v1/search?'
+
+        . http_build_query([
+            'name'     => $ciudad,
+            'count'    => 1,
+            'language' => 'es',
+            'format'   => 'json'
+        ]);
+
+
+    $geo =
+        httpGetJson(
+            $urlGeocoding
+        );
+
+
+    if ($geo === null) {
+
+        return [
+            'ok'   => false,
+            'tipo' => 'api'
+        ];
+    }
+
+
+    if (empty($geo['results'][0])) {
+
+        return [
+            'ok'   => false,
+            'tipo' => 'ciudad'
+        ];
+    }
+
+
+    $lugar =
+        $geo['results'][0];
+
+
+    $latitud =
+        $lugar['latitude'];
+
+    $longitud =
+        $lugar['longitude'];
+
+
+    $nombre =
+        $lugar['name']
+        ?? $ciudad;
+
+
+    $pais =
+        $lugar['country']
+        ?? '';
+
+
+    /*
+     * PASO 2:
+     * Consultar clima actual.
+     */
+
+    $urlClima =
+
+        'https://api.open-meteo.com/v1/forecast?'
+
+        . http_build_query([
+            'latitude'  => $latitud,
+            'longitude' => $longitud,
+            'current'   => 'temperature_2m',
+            'timezone'  => 'auto'
+        ]);
+
+
+    $clima =
+        httpGetJson(
+            $urlClima
+        );
+
+
+    if ($clima === null) {
+
+        return [
+            'ok'   => false,
+            'tipo' => 'api'
+        ];
+    }
+
+
+    if (
+        !isset(
+            $clima['current']['temperature_2m']
+        )
+    ) {
+
+        return [
+            'ok'   => false,
+            'tipo' => 'datos'
+        ];
+    }
+
+
+    return [
+        'ok'          => true,
+        'ciudad'      => $nombre,
+        'pais'        => $pais,
+        'temperatura' =>
+            $clima['current']['temperature_2m']
+    ];
+}
+
+
+/* =========================================================
+   RESPONDER CLIMA
+   ========================================================= */
+
+function responderClima(
+    $chatId,
+    $resultado
+) {
+
+    $ubicacion =
+        $resultado['ciudad'];
+
+
+    if (
+        $resultado['pais'] !== ''
+    ) {
+
+        $ubicacion .=
+            ', '
+            . $resultado['pais'];
+    }
+
+
+    enviarMensaje(
+        $chatId,
+
+        "Temperatura actual en "
+        . $ubicacion
+        . ": "
+        . $resultado['temperatura']
+        . " °C.\n\n"
+
+        . "Este dato proviene del servicio "
+        . "externo Open-Meteo y es únicamente "
+        . "informativo.\n\n"
+
+        . "¿Quieres realizar otra consulta?",
+
+        false,
+        true
     );
 }
 
@@ -599,50 +1012,73 @@ function iniciarAsesoria($chatId, &$estado)
    PROCESAR MENSAJE
    ========================================================= */
 
-function procesarMensaje($chatId, $texto)
-{
-    global $nutrientes, $HUMAN_CONTACT;
+function procesarMensaje(
+    $chatId,
+    $texto
+) {
 
-    $estados = cargarEstados();
+    global
+        $nutrientes,
+        $HUMAN_CONTACT;
 
 
-    /* Crear estado del usuario */
+    $estados =
+        cargarEstados();
 
-    if (!isset($estados[$chatId])) {
-        $estados[$chatId] = nuevoEstado();
+
+    if (
+        !isset(
+            $estados[$chatId]
+        )
+    ) {
+
+        $estados[$chatId] =
+            nuevoEstado();
     }
 
 
-    $estado =& $estados[$chatId];
+    $estado =&
+        $estados[$chatId];
 
-    $textoNormal = normalizar($texto);
+
+    $textoNormal =
+        normalizar($texto);
 
 
     /* =====================================================
        LOG DE ENTRADA
        ===================================================== */
 
-    /*
-     * No registramos nombre/contacto literalmente
-     * para reducir exposición de datos personales.
-     */
-
     if (
-        $estado['estado'] === 'esperando_nombre_asesoria'
+
+        $estado['estado']
+        ===
+        'esperando_nombre_asesoria'
+
         ||
-        $estado['estado'] === 'esperando_contacto_asesoria'
+
+        $estado['estado']
+        ===
+        'esperando_contacto_asesoria'
+
     ) {
 
-        logBot('IN', '[dato personal oculto]');
+        logBot(
+            'IN',
+            '[dato personal oculto]'
+        );
 
     } else {
 
-        logBot('IN', $texto);
+        logBot(
+            'IN',
+            $texto
+        );
     }
 
 
     /* =====================================================
-       COMANDOS GLOBALES
+       /START Y SALUDOS
        ===================================================== */
 
     if (
@@ -661,17 +1097,26 @@ function procesarMensaje($chatId, $texto)
 
     ) {
 
-        $estado = nuevoEstado();
+        $estado =
+            nuevoEstado();
 
-        mostrarMenu($chatId);
 
-        guardarEstados($estados);
+        mostrarMenu(
+            $chatId
+        );
+
+
+        guardarEstados(
+            $estados
+        );
 
         return;
     }
 
 
-    /* AYUDA */
+    /* =====================================================
+       AYUDA
+       ===================================================== */
 
     if (
 
@@ -682,7 +1127,6 @@ function procesarMensaje($chatId, $texto)
     ) {
 
         enviarMensaje(
-
             $chatId,
 
             "¿Necesitas ayuda? Estas son mis opciones:\n\n"
@@ -690,21 +1134,30 @@ function procesarMensaje($chatId, $texto)
             . "1. Comparar vitaminas o nutrientes.\n"
             . "2. Consultar fuentes naturales.\n"
             . "3. Conocer la función de un nutriente.\n"
-            . "4. Solicitar una asesoría nutricional.\n\n"
+            . "4. Solicitar una asesoría nutricional.\n"
+            . "5. Consultar temperatura con /clima CIUDAD.\n\n"
 
-            . "Puedes usar /volver para regresar al menú "
-            . "o /cancelar para detener la operación actual.",
+            . "Ejemplo:\n"
+            . "/clima San Salvador\n\n"
+
+            . "Puedes usar /volver o /cancelar "
+            . "en cualquier momento.",
 
             true
         );
 
-        guardarEstados($estados);
+
+        guardarEstados(
+            $estados
+        );
 
         return;
     }
 
 
-    /* VOLVER */
+    /* =====================================================
+       VOLVER
+       ===================================================== */
 
     if (
 
@@ -714,21 +1167,30 @@ function procesarMensaje($chatId, $texto)
 
     ) {
 
-        $estado = nuevoEstado();
+        $estado =
+            nuevoEstado();
+
 
         enviarMensaje(
             $chatId,
+
             "Regresamos al menú principal.",
+
             true
         );
 
-        guardarEstados($estados);
+
+        guardarEstados(
+            $estados
+        );
 
         return;
     }
 
 
-    /* CANCELAR */
+    /* =====================================================
+       CANCELAR
+       ===================================================== */
 
     if (
 
@@ -738,40 +1200,204 @@ function procesarMensaje($chatId, $texto)
 
     ) {
 
-        $estado = nuevoEstado();
+        $estado =
+            nuevoEstado();
+
 
         enviarMensaje(
-
             $chatId,
 
             "Consulta cancelada.\n\n"
 
-            . "Los datos temporales de esta operación fueron descartados.\n\n"
+            . "Los datos temporales de esta operación "
+            . "fueron descartados.\n\n"
 
             . "Puedes iniciar otra consulta cuando quieras.",
 
             true
         );
 
-        guardarEstados($estados);
+
+        guardarEstados(
+            $estados
+        );
+
+        return;
+    }
+
+/* =====================================================
+   BOTÓN CONSULTAR CLIMA
+   ===================================================== */
+
+if ($textoNormal === 'consultar clima') {
+
+    $estado['estado'] =
+        'esperando_ciudad_clima';
+
+    $estado['intentos'] = 0;
+
+    enviarMensaje(
+        $chatId,
+
+        "¿De qué ciudad quieres consultar "
+        . "la temperatura actual?\n\n"
+
+        . "Por ejemplo: San Salvador."
+    );
+
+    guardarEstados(
+        $estados
+    );
+
+    return;
+}
+
+    /* =====================================================
+       /CLIMA CIUDAD
+       ===================================================== */
+
+    if (
+        str_starts_with(
+            $textoNormal,
+            '/clima'
+        )
+    ) {
+
+        /*
+         * Ejemplo:
+         * /clima San Salvador
+         */
+
+        $ciudad =
+            trim(
+                preg_replace(
+                    '/^\/clima\s*/iu',
+                    '',
+                    $texto
+                )
+            );
+
+
+        /*
+         * Si no proporcionó ciudad,
+         * pedimos solamente ese dato.
+         */
+
+        if (
+            $ciudad === ''
+        ) {
+
+            $estado['estado'] =
+                'esperando_ciudad_clima';
+
+
+            $estado['intentos'] = 0;
+
+
+            enviarMensaje(
+                $chatId,
+
+                "¿De qué ciudad quieres consultar "
+                . "la temperatura actual?\n\n"
+
+                . "Por ejemplo: San Salvador."
+            );
+
+
+            guardarEstados(
+                $estados
+            );
+
+            return;
+        }
+
+
+        $resultado =
+            consultarClima(
+                $ciudad
+            );
+
+
+        if (
+            !$resultado['ok']
+        ) {
+
+            if (
+                $resultado['tipo']
+                ===
+                'ciudad'
+            ) {
+
+                enviarMensaje(
+                    $chatId,
+
+                    "No encontré esa ciudad.\n\n"
+
+                    . "Prueba escribiendo, por ejemplo:\n"
+
+                    . "/clima San Salvador"
+                );
+
+            } else {
+
+                enviarMensaje(
+                    $chatId,
+
+                    "No pude consultar el servicio "
+                    . "de clima en este momento.\n\n"
+
+                    . "Puedes intentarlo nuevamente más tarde."
+                );
+            }
+
+
+            guardarEstados(
+                $estados
+            );
+
+            return;
+        }
+
+
+        responderClima(
+            $chatId,
+            $resultado
+        );
+
+
+        esperarContinuacion(
+            $estado
+        );
+
+
+        guardarEstados(
+            $estados
+        );
 
         return;
     }
 
 
-    /* CONSULTA MÉDICA FUERA DE ALCANCE */
-    if (esConsultaMedicaFueraDeAlcance($texto)) {
+    /* =====================================================
+       CONSULTA FUERA DE ALCANCE
+       ===================================================== */
+
+    if (
+        esConsultaMedicaFueraDeAlcance(
+            $texto
+        )
+    ) {
 
         enviarMensaje(
-
             $chatId,
 
-            "Puedo brindarte información educativa sobre nutrientes, "
-            . "pero no puedo realizar diagnósticos ni indicar medicamentos, "
+            "Puedo brindarte información educativa "
+            . "sobre nutrientes, pero no puedo realizar "
+            . "diagnósticos ni indicar medicamentos, "
             . "tratamientos o dosis.\n\n"
 
-            . "Para este tipo de consulta debes acudir a un profesional "
-            . "de salud o nutrición.\n\n"
+            . "Para este tipo de consulta debes acudir "
+            . "a un profesional de salud o nutrición.\n\n"
 
             . "Si lo deseas, puedes seleccionar "
             . "\"Agendar asesoría\".",
@@ -779,32 +1405,165 @@ function procesarMensaje($chatId, $texto)
             true
         );
 
-        $estado = nuevoEstado();
 
-        guardarEstados($estados);
+        $estado =
+            nuevoEstado();
+
+
+        guardarEstados(
+            $estados
+        );
 
         return;
     }
 
 
-    /* ¿QUIERE CONTINUAR? */
-    if ($estado['estado'] === 'esperando_continuar') {
+    /* =====================================================
+       ESTADO: ESPERANDO CIUDAD
+       ===================================================== */
+
+    if (
+        $estado['estado']
+        ===
+        'esperando_ciudad_clima'
+    ) {
 
         if (
-
-            $textoNormal === 'si'
-            ||
-            $textoNormal === 'sí'
-            ||
-            $textoNormal === 'claro'
-
+            mb_strlen(
+                trim($texto)
+            )
+            <
+            2
         ) {
 
-            $estado = nuevoEstado();
+            errorIntento(
+                $chatId,
+                $estado,
 
-            mostrarMenu($chatId);
+                "Escribe el nombre de una ciudad.\n\n"
+                . "Por ejemplo: San Salvador."
+            );
 
-            guardarEstados($estados);
+
+            guardarEstados(
+                $estados
+            );
+
+            return;
+        }
+
+
+        $resultado =
+            consultarClima(
+                trim($texto)
+            );
+
+
+        if (
+            !$resultado['ok']
+        ) {
+
+            /*
+             * Ciudad no encontrada:
+             * cuenta como intento incorrecto.
+             */
+
+            if (
+                $resultado['tipo']
+                ===
+                'ciudad'
+            ) {
+
+                errorIntento(
+                    $chatId,
+                    $estado,
+
+                    "No encontré esa ciudad.\n\n"
+
+                    . "Por ejemplo: "
+                    . "San Salvador."
+                );
+
+            }
+
+            /*
+             * Si falla la API,
+             * no culpamos al usuario ni
+             * consumimos sus tres intentos.
+             */
+
+            else {
+
+                enviarMensaje(
+                    $chatId,
+
+                    "El servicio de clima no está "
+                    . "disponible en este momento.\n\n"
+
+                    . "Inténtalo nuevamente más tarde.",
+
+                    true
+                );
+
+
+                $estado =
+                    nuevoEstado();
+            }
+
+
+            guardarEstados(
+                $estados
+            );
+
+            return;
+        }
+
+
+        responderClima(
+            $chatId,
+            $resultado
+        );
+
+
+        esperarContinuacion(
+            $estado
+        );
+
+
+        guardarEstados(
+            $estados
+        );
+
+        return;
+    }
+
+
+    /* =====================================================
+       CONTINUAR
+       ===================================================== */
+
+    if (
+        $estado['estado']
+        ===
+        'esperando_continuar'
+    ) {
+
+        if (
+            $textoNormal === 'si'
+        ) {
+
+            $estado =
+                nuevoEstado();
+
+
+            mostrarMenu(
+                $chatId
+            );
+
+
+            guardarEstados(
+                $estados
+            );
 
             return;
         }
@@ -820,120 +1579,101 @@ function procesarMensaje($chatId, $texto)
 
         ) {
 
-            $estado = nuevoEstado();
+            $estado =
+                nuevoEstado();
+
 
             enviarMensaje(
-
                 $chatId,
 
                 "Gracias por usar NutriGuía 🌿\n\n"
-                . "Puedes volver cuando quieras para consultar otro nutriente."
+
+                . "Puedes volver cuando quieras "
+                . "para realizar otra consulta."
             );
 
-            guardarEstados($estados);
+
+            guardarEstados(
+                $estados
+            );
 
             return;
         }
 
 
         errorIntento(
-
             $chatId,
-
             $estado,
 
             "Responde Sí para realizar otra consulta "
             . "o No para finalizar."
         );
 
-        guardarEstados($estados);
+
+        guardarEstados(
+            $estados
+        );
 
         return;
     }
 
 
-    /* CAMBIO DE INTENCIÓN */
+    /* =====================================================
+       CAMBIO A ASESORÍA
+       ===================================================== */
+
     if (
 
-        str_contains($textoNormal, 'agendar asesoria')
+        str_contains(
+            $textoNormal,
+            'agendar asesoria'
+        )
         ||
-        str_contains($textoNormal, 'solicitar asesoria')
+        str_contains(
+            $textoNormal,
+            'solicitar asesoria'
+        )
         ||
-        str_contains($textoNormal, 'quiero una asesoria')
+        str_contains(
+            $textoNormal,
+            'quiero una asesoria'
+        )
         ||
-        str_contains($textoNormal, 'quiero una cita')
+        str_contains(
+            $textoNormal,
+            'quiero una cita'
+        )
 
     ) {
 
-        iniciarAsesoria($chatId, $estado);
+        iniciarAsesoria(
+            $chatId,
+            $estado
+        );
 
-        guardarEstados($estados);
+
+        guardarEstados(
+            $estados
+        );
 
         return;
     }
 
 
-    /* FLUJO: FUENTES NATURALES */
-    if ($estado['estado'] === 'esperando_fuente') {
+    /* =====================================================
+       ESPERANDO FUENTE
+       ===================================================== */
 
-        /* Si cambia explícitamente a comparar */
-        if (str_contains($textoNormal, 'compar')) {
+    if (
+        $estado['estado']
+        ===
+        'esperando_fuente'
+    ) {
 
-            $detectados = detectarNutrientes($texto);
-
-            if (count($detectados) >= 2) {
-
-                responderComparacion(
-                    $chatId,
-                    $detectados[0],
-                    $detectados[1]
-                );
-
-                esperarContinuacion($estado);
-
-            } elseif (count($detectados) === 1) {
-
-                $estado['nutriente_1'] = $detectados[0];
-
-                $estado['estado'] =
-                    'esperando_nutriente_2';
-
-                $estado['intentos'] = 0;
-
-                enviarMensaje(
-
-                    $chatId,
-
-                    "Ya tengo "
-                    . $nutrientes[$detectados[0]]['nombre']
-                    . ".\n\n"
-
-                    . "¿Con qué otro nutriente quieres compararlo?"
-                );
-
-            } else {
-
-                $estado = nuevoEstado();
-
-                $estado['estado'] =
-                    'esperando_nutriente_1';
-
-                enviarMensaje(
-
-                    $chatId,
-
-                    "¿Qué dos nutrientes quieres comparar?\n\n"
-                    . "Por ejemplo: vitamina C y vitamina B12."
-                );
-            }
-
-            guardarEstados($estados);
-
-            return;
-        }
-
-
-        $detectados = detectarNutrientes($texto);
+        $detectados =
+            detectarNutrientes(
+                $texto
+            );
 
 
         if ($detectados) {
@@ -943,33 +1683,47 @@ function procesarMensaje($chatId, $texto)
                 $detectados[0]
             );
 
-            esperarContinuacion($estado);
+
+            esperarContinuacion(
+                $estado
+            );
 
         } else {
 
             errorIntento(
-
                 $chatId,
-
                 $estado,
 
                 "No reconocí ese nutriente.\n\n"
+
                 . "Por ejemplo: vitamina B12, "
                 . "vitamina C, hierro o calcio."
             );
         }
 
 
-        guardarEstados($estados);
+        guardarEstados(
+            $estados
+        );
 
         return;
     }
 
 
-    /* FLUJO: FUNCIÓN */
-    if ($estado['estado'] === 'esperando_funcion') {
+    /* =====================================================
+       ESPERANDO FUNCIÓN
+       ===================================================== */
 
-        $detectados = detectarNutrientes($texto);
+    if (
+        $estado['estado']
+        ===
+        'esperando_funcion'
+    ) {
+
+        $detectados =
+            detectarNutrientes(
+                $texto
+            );
 
 
         if ($detectados) {
@@ -979,191 +1733,276 @@ function procesarMensaje($chatId, $texto)
                 $detectados[0]
             );
 
-            esperarContinuacion($estado);
+
+            esperarContinuacion(
+                $estado
+            );
 
         } else {
 
             errorIntento(
-
                 $chatId,
-
                 $estado,
 
                 "No reconocí ese nutriente.\n\n"
+
                 . "Por ejemplo: vitamina C, "
                 . "vitamina D, hierro o calcio."
             );
         }
 
 
-        guardarEstados($estados);
+        guardarEstados(
+            $estados
+        );
 
         return;
     }
 
 
-    /* COMPARACIÓN - PRIMER NUTRIENTE */
-    if ($estado['estado'] === 'esperando_nutriente_1') {
+    /* =====================================================
+       COMPARAR - PRIMER NUTRIENTE
+       ===================================================== */
 
-        $detectados = detectarNutrientes($texto);
+    if (
+        $estado['estado']
+        ===
+        'esperando_nutriente_1'
+    ) {
+
+        $detectados =
+            detectarNutrientes(
+                $texto
+            );
 
 
-        /* Ya proporcionó ambos */
-
-        if (count($detectados) >= 2) {
+        if (
+            count($detectados)
+            >=
+            2
+        ) {
 
             responderComparacion(
-
                 $chatId,
-
                 $detectados[0],
                 $detectados[1]
             );
 
-            esperarContinuacion($estado);
+
+            esperarContinuacion(
+                $estado
+            );
+
         }
 
 
-        /* Proporcionó solo el primero */
-
-        elseif (count($detectados) === 1) {
+        elseif (
+            count($detectados)
+            ===
+            1
+        ) {
 
             $estado['nutriente_1'] =
                 $detectados[0];
 
+
             $estado['estado'] =
                 'esperando_nutriente_2';
+
 
             $estado['intentos'] = 0;
 
 
             enviarMensaje(
-
                 $chatId,
 
                 "Ya tengo "
-                . $nutrientes[$detectados[0]]['nombre']
+                . $nutrientes[
+                    $detectados[0]
+                ]['nombre']
                 . ".\n\n"
 
-                . "¿Con qué otro nutriente quieres compararlo?\n\n"
+                . "¿Con qué otro nutriente "
+                . "quieres compararlo?\n\n"
 
                 . "Por ejemplo: vitamina B12, "
                 . "vitamina D o hierro."
             );
+
         }
 
-
-        /* Ninguno reconocido */
 
         else {
 
             errorIntento(
-
                 $chatId,
-
                 $estado,
 
                 "No reconocí ningún nutriente.\n\n"
-                . "Por ejemplo: vitamina C y vitamina B12."
+
+                . "Por ejemplo: vitamina B "
+                . "y vitamina B12."
             );
         }
 
 
-        guardarEstados($estados);
+        guardarEstados(
+            $estados
+        );
 
         return;
     }
 
 
-    /* COMPARACIÓN - SEGUNDO NUTRIENTE */
-    if ($estado['estado'] === 'esperando_nutriente_2') {
+    /* =====================================================
+       COMPARAR - SEGUNDO NUTRIENTE
+       ===================================================== */
 
-        $detectados = detectarNutrientes($texto);
+    if (
+        $estado['estado']
+        ===
+        'esperando_nutriente_2'
+    ) {
+
+        $detectados =
+            detectarNutrientes(
+                $texto
+            );
 
 
         if (!$detectados) {
 
             errorIntento(
-
                 $chatId,
-
                 $estado,
 
                 "No reconocí el segundo nutriente.\n\n"
+
                 . "Por ejemplo: vitamina C, "
                 . "vitamina D o hierro."
             );
 
-            guardarEstados($estados);
+
+            guardarEstados(
+                $estados
+            );
 
             return;
         }
 
 
-        $segundo = $detectados[0];
+        $segundo =
+            $detectados[0];
 
 
-        /* Evitar comparar consigo mismo */
-
-        if ($segundo === $estado['nutriente_1']) {
+        if (
+            $segundo
+            ===
+            $estado['nutriente_1']
+        ) {
 
             errorIntento(
-
                 $chatId,
-
                 $estado,
 
                 "Ya seleccionaste ese nutriente.\n\n"
-                . "Elige uno diferente para realizar la comparación."
+
+                . "Elige uno diferente "
+                . "para realizar la comparación."
             );
 
-            guardarEstados($estados);
+
+            guardarEstados(
+                $estados
+            );
 
             return;
         }
 
 
         responderComparacion(
-
             $chatId,
-
             $estado['nutriente_1'],
             $segundo
         );
 
 
-        esperarContinuacion($estado);
+        esperarContinuacion(
+            $estado
+        );
 
-        guardarEstados($estados);
+
+        guardarEstados(
+            $estados
+        );
 
         return;
     }
 
 
-    /* NUTRIENTE SIN INTENCIÓN DEFINIDA */
-    if ($estado['estado'] === 'esperando_accion_nutriente') {
+    /* =====================================================
+       NUTRIENTE YA IDENTIFICADO
+       ===================================================== */
 
-        $nutriente = $estado['nutriente_1'];
+    if (
+        $estado['estado']
+        ===
+        'esperando_accion_nutriente'
+    ) {
+
+        $nutriente =
+            $estado['nutriente_1'];
 
 
-        if (str_contains($textoNormal, 'fuente')) {
+        if (
+
+            str_contains(
+                $textoNormal,
+                'fuente'
+            )
+
+            ||
+
+            str_contains(
+                $textoNormal,
+                'natural'
+            )
+
+        ) {
 
             responderFuentes(
                 $chatId,
                 $nutriente
             );
 
-            esperarContinuacion($estado);
+
+            esperarContinuacion(
+                $estado
+            );
 
         }
 
+
         elseif (
 
-            str_contains($textoNormal, 'funcion')
+            str_contains(
+                $textoNormal,
+                'funcion'
+            )
+
             ||
-            str_contains($textoNormal, 'sirve')
+
+            str_contains(
+                $textoNormal,
+                'sirve'
+            )
+
             ||
-            str_contains($textoNormal, 'beneficio')
+
+            str_contains(
+                $textoNormal,
+                'beneficio'
+            )
 
         ) {
 
@@ -1172,40 +2011,52 @@ function procesarMensaje($chatId, $texto)
                 $nutriente
             );
 
-            esperarContinuacion($estado);
+
+            esperarContinuacion(
+                $estado
+            );
 
         }
 
-        elseif (str_contains($textoNormal, 'compar')) {
+
+        elseif (
+            str_contains(
+                $textoNormal,
+                'compar'
+            )
+        ) {
 
             $estado['estado'] =
                 'esperando_nutriente_2';
+
 
             $estado['intentos'] = 0;
 
 
             enviarMensaje(
-
                 $chatId,
 
                 "Perfecto. Ya tengo "
-                . $nutrientes[$nutriente]['nombre']
+                . $nutrientes[
+                    $nutriente
+                ]['nombre']
                 . ".\n\n"
 
-                . "¿Con qué otro nutriente quieres compararlo?"
+                . "¿Con qué otro nutriente "
+                . "quieres compararlo?"
             );
 
         }
 
+
         else {
 
             errorIntento(
-
                 $chatId,
-
                 $estado,
 
                 "Indica qué quieres consultar:\n\n"
+
                 . "• Fuentes naturales\n"
                 . "• Función\n"
                 . "• Comparar"
@@ -1213,21 +2064,34 @@ function procesarMensaje($chatId, $texto)
         }
 
 
-        guardarEstados($estados);
+        guardarEstados(
+            $estados
+        );
 
         return;
     }
 
 
-    /* ASESORÍA - NOMBRE */
-    if ($estado['estado'] === 'esperando_nombre_asesoria') {
+    /* =====================================================
+       ASESORÍA - NOMBRE
+       ===================================================== */
 
-        if (mb_strlen(trim($texto)) < 2) {
+    if (
+        $estado['estado']
+        ===
+        'esperando_nombre_asesoria'
+    ) {
+
+        if (
+            mb_strlen(
+                trim($texto)
+            )
+            <
+            2
+        ) {
 
             errorIntento(
-
                 $chatId,
-
                 $estado,
 
                 "El nombre parece incompleto."
@@ -1235,41 +2099,57 @@ function procesarMensaje($chatId, $texto)
 
         } else {
 
-            $estado['nombre'] = trim($texto);
+            $estado['nombre'] =
+                trim($texto);
+
 
             $estado['estado'] =
                 'esperando_contacto_asesoria';
+
 
             $estado['intentos'] = 0;
 
 
             enviarMensaje(
-
                 $chatId,
 
                 "Gracias.\n\n"
 
-                . "Ahora indícame un medio de contacto "
-                . "para continuar con la solicitud."
+                . "Ahora indícame un medio "
+                . "de contacto para continuar "
+                . "con la solicitud."
             );
         }
 
 
-        guardarEstados($estados);
+        guardarEstados(
+            $estados
+        );
 
         return;
     }
 
 
-    /* ASESORÍA - CONTACTO */
-    if ($estado['estado'] === 'esperando_contacto_asesoria') {
+    /* =====================================================
+       ASESORÍA - CONTACTO
+       ===================================================== */
 
-        if (mb_strlen(trim($texto)) < 4) {
+    if (
+        $estado['estado']
+        ===
+        'esperando_contacto_asesoria'
+    ) {
+
+        if (
+            mb_strlen(
+                trim($texto)
+            )
+            <
+            4
+        ) {
 
             errorIntento(
-
                 $chatId,
-
                 $estado,
 
                 "El dato de contacto parece incompleto."
@@ -1277,47 +2157,58 @@ function procesarMensaje($chatId, $texto)
 
         } else {
 
-            $estado['contacto'] = trim($texto);
+            $estado['contacto'] =
+                trim($texto);
+
 
             $estado['estado'] =
                 'confirmando_asesoria';
+
 
             $estado['intentos'] = 0;
 
 
             enviarMensaje(
-
                 $chatId,
 
                 "Ya tengo los datos necesarios.\n\n"
 
-                . "¿Confirmas que deseas solicitar "
-                . "la asesoría?\n\n"
+                . "¿Confirmas que deseas "
+                . "solicitar la asesoría?\n\n"
 
-                . "Responde Sí o No."
+                . "Responde Sí o No.",
+
+                false,
+                true
             );
         }
 
 
-        guardarEstados($estados);
+        guardarEstados(
+            $estados
+        );
 
         return;
     }
 
 
-    /* ASESORÍA - CONFIRMACIÓN */
-    if ($estado['estado'] === 'confirmando_asesoria') {
+    /* =====================================================
+       ASESORÍA - CONFIRMACIÓN
+       ===================================================== */
+
+    if (
+        $estado['estado']
+        ===
+        'confirmando_asesoria'
+    ) {
 
         if (
-
-            $textoNormal === 'si'
-            ||
-            $textoNormal === 'sí'
-
+            $textoNormal
+            ===
+            'si'
         ) {
 
             enviarMensaje(
-
                 $chatId,
 
                 "Solicitud confirmada ✅\n\n"
@@ -1325,152 +2216,199 @@ function procesarMensaje($chatId, $texto)
                 . "Puedes continuar la atención con "
                 . "{$HUMAN_CONTACT}.\n\n"
 
-                . "¿Quieres realizar otra consulta?"
+                . "¿Quieres realizar otra consulta?",
+
+                false,
+                true
             );
 
 
-            esperarContinuacion($estado);
+            esperarContinuacion(
+                $estado
+            );
 
         }
 
-        elseif ($textoNormal === 'no') {
 
-            $estado = nuevoEstado();
+        elseif (
+            $textoNormal
+            ===
+            'no'
+        ) {
+
+            $estado =
+                nuevoEstado();
 
 
             enviarMensaje(
-
                 $chatId,
 
                 "Solicitud cancelada.\n\n"
 
-                . "Los datos temporales fueron descartados.\n\n"
+                . "Los datos temporales "
+                . "fueron descartados.\n\n"
 
-                . "Puedes iniciar otra consulta cuando quieras.",
+                . "Puedes iniciar otra consulta "
+                . "cuando quieras.",
 
                 true
             );
 
         }
 
+
         else {
 
             errorIntento(
-
                 $chatId,
-
                 $estado,
 
-                "Para confirmar la solicitud responde Sí o No."
+                "Para confirmar la solicitud "
+                . "responde Sí o No."
             );
         }
 
 
-        guardarEstados($estados);
+        guardarEstados(
+            $estados
+        );
 
         return;
     }
 
 
-    /* DETECCIÓN DE INTENCIÓN DESDE EL MENÚ */
-    $detectados = detectarNutrientes($texto);
+    /* =====================================================
+       DETECTAR INTENCIÓN
+       ===================================================== */
+
+    $detectados =
+        detectarNutrientes(
+            $texto
+        );
 
 
     /* COMPARAR */
+
     if (
-
-        str_contains($textoNormal, 'compar')
-        ||
-        $textoNormal === 'comparar nutrientes'
-
+        str_contains(
+            $textoNormal,
+            'compar'
+        )
     ) {
 
-        /* Ya escribió ambos */
-
-        if (count($detectados) >= 2) {
+        if (
+            count($detectados)
+            >=
+            2
+        ) {
 
             responderComparacion(
-
                 $chatId,
-
                 $detectados[0],
                 $detectados[1]
             );
 
 
-            esperarContinuacion($estado);
-
-        }
-
-
-        /* Ya escribió uno */
-
-        elseif (count($detectados) === 1) {
-
-            $estado['nutriente_1'] =
-                $detectados[0];
-
-            $estado['estado'] =
-                'esperando_nutriente_2';
-
-            $estado['intentos'] = 0;
-
-
-            enviarMensaje(
-
-                $chatId,
-
-                "Ya tengo "
-                . $nutrientes[$detectados[0]]['nombre']
-                . ".\n\n"
-
-                . "¿Con qué otro nutriente quieres compararlo?\n\n"
-
-                . "Por ejemplo: vitamina B12, "
-                . "vitamina D o hierro."
+            esperarContinuacion(
+                $estado
             );
 
         }
 
 
-        /* No escribió ninguno */
+        elseif (
+            count($detectados)
+            ===
+            1
+        ) {
+
+            $estado['nutriente_1'] =
+                $detectados[0];
+
+
+            $estado['estado'] =
+                'esperando_nutriente_2';
+
+
+            $estado['intentos'] = 0;
+
+
+            enviarMensaje(
+                $chatId,
+
+                "Ya tengo "
+                . $nutrientes[
+                    $detectados[0]
+                ]['nombre']
+                . ".\n\n"
+
+                . "¿Con qué otro nutriente "
+                . "quieres compararlo?"
+            );
+
+        }
+
 
         else {
 
             $estado['estado'] =
                 'esperando_nutriente_1';
 
+
             $estado['intentos'] = 0;
 
 
             enviarMensaje(
-
                 $chatId,
 
                 "¿Qué dos nutrientes quieres comparar?\n\n"
 
-                . "Por ejemplo: vitamina C y vitamina B12."
+                . "Por ejemplo: vitamina B "
+                . "y vitamina B12."
             );
         }
     }
 
 
-    /* FUENTES NATURALES */
+    /* FUENTES */
+
     elseif (
 
-        str_contains($textoNormal, 'fuente')
+        str_contains(
+            $textoNormal,
+            'fuente'
+        )
+
         ||
-        str_contains($textoNormal, 'alimento')
+
+        str_contains(
+            $textoNormal,
+            'alimento'
+        )
+
         ||
-        str_contains($textoNormal, 'natural')
+
+        str_contains(
+            $textoNormal,
+            'natural'
+        )
+
         ||
-        str_contains($textoNormal, 'contiene')
+
+        str_contains(
+            $textoNormal,
+            'contiene'
+        )
+
         ||
-        str_contains($textoNormal, 'obtener')
+
+        str_contains(
+            $textoNormal,
+            'obtener'
+        )
 
     ) {
 
-        /* Ya escribio el nutriente */
         if ($detectados) {
 
             responderFuentes(
@@ -1479,26 +2417,24 @@ function procesarMensaje($chatId, $texto)
             );
 
 
-            esperarContinuacion($estado);
+            esperarContinuacion(
+                $estado
+            );
 
-        }
-
-
-        /* Falta el nutriente */
-
-        else {
+        } else {
 
             $estado['estado'] =
                 'esperando_fuente';
+
 
             $estado['intentos'] = 0;
 
 
             enviarMensaje(
-
                 $chatId,
 
-                "¿Qué vitamina o nutriente quieres consultar?\n\n"
+                "¿Qué vitamina o nutriente "
+                . "quieres consultar?\n\n"
 
                 . "Por ejemplo: vitamina B12, "
                 . "vitamina C, hierro o calcio."
@@ -1507,14 +2443,28 @@ function procesarMensaje($chatId, $texto)
     }
 
 
-    /* FUNCIÓN DEL NUTRIENTE */
+    /* FUNCIÓN */
+
     elseif (
 
-        str_contains($textoNormal, 'funcion')
+        str_contains(
+            $textoNormal,
+            'funcion'
+        )
+
         ||
-        str_contains($textoNormal, 'sirve')
+
+        str_contains(
+            $textoNormal,
+            'sirve'
+        )
+
         ||
-        str_contains($textoNormal, 'beneficio')
+
+        str_contains(
+            $textoNormal,
+            'beneficio'
+        )
 
     ) {
 
@@ -1526,23 +2476,24 @@ function procesarMensaje($chatId, $texto)
             );
 
 
-            esperarContinuacion($estado);
+            esperarContinuacion(
+                $estado
+            );
 
-        }
-
-        else {
+        } else {
 
             $estado['estado'] =
                 'esperando_funcion';
+
 
             $estado['intentos'] = 0;
 
 
             enviarMensaje(
-
                 $chatId,
 
-                "¿De qué nutriente quieres conocer su función?\n\n"
+                "¿De qué nutriente quieres "
+                . "conocer su función?\n\n"
 
                 . "Por ejemplo: vitamina C, "
                 . "vitamina D, hierro o calcio."
@@ -1552,11 +2503,20 @@ function procesarMensaje($chatId, $texto)
 
 
     /* ASESORÍA */
+
     elseif (
 
-        str_contains($textoNormal, 'asesoria')
+        str_contains(
+            $textoNormal,
+            'asesoria'
+        )
+
         ||
-        str_contains($textoNormal, 'cita')
+
+        str_contains(
+            $textoNormal,
+            'cita'
+        )
 
     ) {
 
@@ -1567,78 +2527,33 @@ function procesarMensaje($chatId, $texto)
     }
 
 
-    /* BOTONES */
-    elseif ($textoNormal === 'fuentes naturales') {
+    /* NUTRIENTE SIN INTENCIÓN */
 
-        $estado['estado'] =
-            'esperando_fuente';
-
-        $estado['intentos'] = 0;
-
-
-        enviarMensaje(
-
-            $chatId,
-
-            "¿Qué vitamina o nutriente quieres consultar?\n\n"
-
-            . "Por ejemplo: vitamina B12, "
-            . "vitamina C, hierro o calcio."
-        );
-    }
-
-
-    elseif (
-
-        $textoNormal === 'funcion de un nutriente'
-
-    ) {
-
-        $estado['estado'] =
-            'esperando_funcion';
-
-        $estado['intentos'] = 0;
-
-
-        enviarMensaje(
-
-            $chatId,
-
-            "¿De qué nutriente quieres conocer su función?"
-        );
-    }
-
-
-    elseif ($textoNormal === 'agendar asesoria') {
-
-        iniciarAsesoria(
-            $chatId,
-            $estado
-        );
-    }
-
-
-    /* Reconoce en nutriente pero sin contexto */
     elseif ($detectados) {
 
-        $estado = nuevoEstado();
+        $estado =
+            nuevoEstado();
+
 
         $estado['estado'] =
             'esperando_accion_nutriente';
+
 
         $estado['nutriente_1'] =
             $detectados[0];
 
 
         enviarMensaje(
-
             $chatId,
 
             "Identifiqué "
-            . $nutrientes[$detectados[0]]['nombre']
+            . $nutrientes[
+                $detectados[0]
+            ]['nombre']
             . ".\n\n"
 
-            . "¿Qué quieres consultar sobre este nutriente?\n\n"
+            . "¿Qué quieres consultar "
+            . "sobre este nutriente?\n\n"
 
             . "• Fuentes naturales\n"
             . "• Función\n"
@@ -1647,13 +2562,12 @@ function procesarMensaje($chatId, $texto)
     }
 
 
-    /* Entrada no reconocida */
+    /* NO RECONOCIDO */
+
     else {
 
         errorIntento(
-
             $chatId,
-
             $estado,
 
             "No pude identificar tu consulta.\n\n"
@@ -1662,22 +2576,30 @@ function procesarMensaje($chatId, $texto)
 
             . "• ¿Qué alimentos contienen vitamina B12?\n"
             . "• ¿Para qué sirve la vitamina C?\n"
-            . "• Quiero comparar vitamina C y vitamina B12.\n\n"
+            . "• Quiero comparar vitamina B y vitamina B12.\n\n"
 
             . "También puedes usar /ayuda."
         );
     }
 
 
-    guardarEstados($estados);
+    guardarEstados(
+        $estados
+    );
 }
 
 
-/* PROCESAR UPDATE DE TELEGRAM */
+/* =========================================================
+   PROCESAR UPDATE
+   ========================================================= */
 
 function procesarUpdate($update)
 {
-    if (!isset($update['message']['chat']['id'])) {
+    if (
+        !isset(
+            $update['message']['chat']['id']
+        )
+    ) {
         return;
     }
 
@@ -1687,7 +2609,10 @@ function procesarUpdate($update)
 
 
     $texto =
-        trim($update['message']['text'] ?? '');
+        trim(
+            $update['message']['text']
+            ?? ''
+        );
 
 
     if ($texto === '') {
@@ -1702,9 +2627,15 @@ function procesarUpdate($update)
 }
 
 
-/* LONG POLLING */
+/* =========================================================
+   LONG POLLING
+   ========================================================= */
 
-if (php_sapi_name() === 'cli') {
+if (
+    php_sapi_name()
+    ===
+    'cli'
+) {
 
     echo "====================================\n";
     echo " NutriGuia iniciado\n";
@@ -1717,38 +2648,45 @@ if (php_sapi_name() === 'cli') {
 
     while (true) {
 
-        $respuesta = telegram(
-
-            'getUpdates',
-
-            [
-                'timeout' => 25,
-                'offset'  => $offset
-            ]
-        );
+        $respuesta =
+            telegram(
+                'getUpdates',
+                [
+                    'timeout' => 25,
+                    'offset'  => $offset
+                ]
+            );
 
 
         foreach (
-            $respuesta['result'] ?? []
+            $respuesta['result']
+            ?? []
             as $update
         ) {
 
             $offset =
-                $update['update_id'] + 1;
+                $update['update_id']
+                + 1;
 
 
-            procesarUpdate($update);
+            procesarUpdate(
+                $update
+            );
         }
     }
 }
 
 
-/* WEBHOOK */
+/* =========================================================
+   WEBHOOK
+   ========================================================= */
 
 else {
 
     $contenido =
-        file_get_contents('php://input');
+        file_get_contents(
+            'php://input'
+        );
 
 
     $update =
@@ -1758,7 +2696,12 @@ else {
         );
 
 
-    if (is_array($update)) {
-        procesarUpdate($update);
+    if (
+        is_array($update)
+    ) {
+
+        procesarUpdate(
+            $update
+        );
     }
 }
