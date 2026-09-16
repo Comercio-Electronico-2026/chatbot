@@ -100,3 +100,125 @@ echo "✅ Bot conectado exitosamente: @"
    . ")\n";
 
 echo "📡 Escuchando mensajes con Long Polling (Presiona Ctrl + C para salir)...\n\n";
+
+
+// LONG POLLING
+
+$offset = 0;
+
+while (true) {
+
+    $data = telegram('getUpdates', [
+        'timeout' => 30,
+        'offset' => $offset
+    ]);
+
+    if (!$data || !isset($data['result'])) {
+        sleep(2);
+        continue;
+    }
+
+    foreach ($data['result'] as $update) {
+
+        $offset = $update['update_id'] + 1;
+
+        if (!isset($update['message']['text'])) {
+            continue;
+        }
+
+        $message = $update['message'];
+
+        $chatId = $message['chat']['id'];
+        $nombre = $message['from']['first_name'] ?? 'Usuario';
+        $texto = trim($message['text']);
+
+        // Registrar entrada
+        logAccion(
+            'INFO',
+            "Usuario '{$nombre}' (Chat ID: {$chatId}): {$texto}"
+        );
+
+        // COMANDOS
+
+        if ($texto === '/start') {
+
+            mostrarMenu($chatId, $nombre);
+
+            logAccion(
+                'INFO',
+                "Respondido /start al usuario '{$nombre}' (Chat ID: {$chatId})"
+            );
+
+        } elseif ($texto === '/help') {
+
+            enviarMensaje(
+                $chatId,
+                "❓ Ayuda\n\n"
+                . "/start - Mostrar menú\n"
+                . "/pedido - Consultar pedido\n"
+                . "/catalogo - Ver catálogo\n"
+                . "/soporte - Contactar soporte\n"
+                . "/cancel - Cancelar operación"
+            );
+
+        } elseif ($texto === '/cancel') {
+
+            enviarMensaje(
+                $chatId,
+                "❌ Operación cancelada. Usa /start para volver al menú."
+            );
+
+        } elseif ($texto === '/soporte') {
+
+            enviarMensaje(
+                $chatId,
+                "👤 Has solicitado soporte.\n"
+                . "Un asesor podrá ayudarte con tu solicitud."
+            );
+
+        } elseif ($texto === '/pedido') {
+
+            enviarMensaje(
+                $chatId,
+                "📦 Escribe tu número de pedido de 4 dígitos."
+            );
+
+        } elseif ($texto === '/catalogo') {
+
+            // Aqui el servicio REST del catalogo (lo programare mas adelante).
+            enviarMensaje(
+                $chatId,
+                "🛍️ Consultando catálogo..."
+            );
+
+        } else {
+
+            // Validacion basica de número de pedido
+            if (preg_match('/^\d{4}$/', $texto)) {
+
+                enviarMensaje(
+                    $chatId,
+                    "📦 Consultando el pedido {$texto}..."
+                );
+
+                logAccion(
+                    'INFO',
+                    "Consulta de pedido {$texto} realizada por '{$nombre}' (Chat ID: {$chatId})"
+                );
+
+            } else {
+
+                enviarMensaje(
+                    $chatId,
+                    "🤔 No entendí tu solicitud.\n\n"
+                    . "Usa /help para ver las opciones disponibles."
+                );
+
+                logAccion(
+                    'WARN',
+                    "Entrada no reconocida de '{$nombre}': {$texto}"
+                );
+            }
+        }
+    }
+}
