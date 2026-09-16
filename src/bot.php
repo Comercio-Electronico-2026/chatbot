@@ -28,6 +28,7 @@ $apiUrl = "https://api.telegram.org/bot{$botToken}/";
 
 // FUNCIONES DEL BOT
 
+// Funciones basicas
 function telegram(string $method, array $data = []): ?array
 {
     global $apiUrl;
@@ -82,6 +83,71 @@ function mostrarMenu(int $chatId, string $nombre): void
              . "¿En qué te puedo ayudar?";
 
     enviarMensaje($chatId, $mensaje);
+}
+
+
+// Integrando groq a la conversacion limitandolo a responder solo en casos especificos
+
+function consultarGroq(string $mensaje): string
+{
+    $apiKey = getenv('GROQ_API_KEY') ?: ($_ENV['GROQ_API_KEY'] ?? '');
+
+    if (!$apiKey) {
+        return "Lo siento, el servicio de asistencia no está disponible en este momento.";
+    }
+
+    $datos = [
+        'model' => 'openai/gpt-oss-20b',
+        'messages' => [
+            [
+                'role' => 'system',
+                'content' =>
+                    'Eres el asistente virtual de TechShift, una tienda de comercio electrónico. '
+                    . 'Responde siempre en español, de forma breve, clara y amable. '
+                    . 'Puedes responder preguntas generales sobre la tienda y orientar al usuario. '
+                    . 'No inventes precios, existencias, pedidos ni estados de pedidos. '
+                    . 'Para consultar pedidos, pagos o información de inventario, indica al usuario '
+                    . 'que debe utilizar las opciones correspondientes del bot.'
+            ],
+            [
+                'role' => 'user',
+                'content' => $mensaje
+            ]
+        ],
+        'temperature' => 0.3,
+        'max_completion_tokens' => 300
+    ];
+
+    $ch = curl_init('https://api.groq.com/openai/v1/chat/completions');
+
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POSTFIELDS => json_encode($datos),
+        CURLOPT_HTTPHEADER => [
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $apiKey
+        ],
+        CURLOPT_TIMEOUT => 30
+    ]);
+
+    $respuesta = curl_exec($ch);
+    $error = curl_error($ch);
+    curl_close($ch);
+
+    if ($respuesta === false || $error) {
+        logAccion('ERROR', "Error al conectar con Groq: {$error}");
+        return "Lo siento, no pude procesar tu consulta en este momento.";
+    }
+
+    $resultado = json_decode($respuesta, true);
+
+    if (!isset($resultado['choices'][0]['message']['content'])) {
+        logAccion('ERROR', 'Groq devolvió una respuesta inesperada: ' . $respuesta);
+        return "Lo siento, no pude generar una respuesta.";
+    }
+
+    return trim($resultado['choices'][0]['message']['content']);
 }
 
 
@@ -208,15 +274,18 @@ while (true) {
 
             } else {
 
-                enviarMensaje(
-                    $chatId,
-                    "🤔 No entendí tu solicitud.\n\n"
-                    . "Usa /help para ver las opciones disponibles."
+                logAccion(
+                     'INFO',
+                     "Enviando consulta abierta de '{$nombre}' a Groq: {$texto}"
                 );
 
+                $respuesta = consultarGroq($texto);
+
+                enviarMensaje($chatId, $respuesta);
+
                 logAccion(
-                    'WARN',
-                    "Entrada no reconocida de '{$nombre}': {$texto}"
+                     'INFO',
+                     "Respuesta de Groq enviada a '{$nombre}'"
                 );
             }
         }
