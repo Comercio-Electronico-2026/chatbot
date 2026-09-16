@@ -244,9 +244,13 @@ function getSupportText(): string
 {
     return
         "👤 Atención humana\n\n" .
-        "Si tu consulta no puede ser resuelta por el bot, " .
-        "puedes recurrir al canal de atención de MusicHub.\n\n" .
-        "El medio de contacto será configurado para la tienda.\n\n" .
+        "Si necesitas ayuda adicional o tu consulta " .
+        "está fuera del alcance de MusicHub Bot, " .
+        "puedes comunicarte con nuestro canal de soporte:\n\n" .
+        "📧 hv21011@ues.edu.sv\n\n" .
+        "Describe brevemente tu consulta y, si corresponde, " .
+        "incluye el número de tu pedido.\n\n" .
+        "Por seguridad, no envíes contraseñas ni datos bancarios.\n\n" .
         "También puedes escribir /menu para volver al menú principal.";
 }
 
@@ -1583,10 +1587,12 @@ while (true) {
 
                     sendMessage(
                         $chatId,
-                        "Parece que estamos teniendo problemas " .
-                        "con la búsqueda.\n\n" .
-                        "Puedes escribir /menu para volver " .
-                        "al menú o /soporte para recibir ayuda."
+			"No pude reconocer tus últimos mensajes.\n\n" .
+			"Parece que tu consulta puede estar fuera " .
+			"de lo que MusicHub Bot puede resolver actualmente.\n\n" .
+			"Puedes escribir /menu para volver al menú, " .
+			"/ayuda para revisar las opciones disponibles " .
+			"o /soporte para comunicarte con atención humana."
                     );
 
                     continue;
