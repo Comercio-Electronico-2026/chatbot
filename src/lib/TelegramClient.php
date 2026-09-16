@@ -24,7 +24,6 @@ final class TelegramClient
         ]);
         $raw = curl_exec($ch);
         $error = $raw === false ? curl_error($ch) : null;
-        curl_close($ch);
 
         if ($raw === false) {
             Log::error('telegram.' . $method, $error ?: 'fallo de conexion');

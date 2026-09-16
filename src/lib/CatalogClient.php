@@ -114,7 +114,6 @@ final class CatalogClient
         $raw = curl_exec($ch);
         $error = $raw === false ? curl_error($ch) : null;
         $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-        curl_close($ch);
 
         if ($raw === false) {
             Log::error('catalogo', $error ?: 'fallo de conexion');
