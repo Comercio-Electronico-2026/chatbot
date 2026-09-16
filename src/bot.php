@@ -1,28 +1,8 @@
 <?php
 
 /*
- * NutriGuía - Laboratorio 5b
- * Carnet: JO20004
- *
- * Funciones:
- * - /start y saludos
- * - /ayuda
- * - /volver
- * - /cancelar
- * - Comparar nutrientes
- * - Consultar fuentes naturales
- * - Consultar función de un nutriente
- * - Solicitar asesoría
- * - Máximo 3 intentos
- * - Slot filling
- * - Reutilización de datos
- * - Consultas fuera de alcance
- * - Logs
- * - API REST Open-Meteo
- * - Long polling
- * - Webhook
- */
-
+NutriGuía - Laboratorio 5b
+Carnet: JO20004
 
 /* =========================================================
    CONFIGURACIÓN
@@ -33,6 +13,14 @@ $ROOT = dirname(__DIR__);
 $env = parse_ini_file($ROOT . '/.env');
 
 $TOKEN = $env['BOT_TOKEN'] ?? null;
+
+$OLLAMA_URL =
+    $env['OLLAMA_URL']
+    ?? 'http://127.0.0.1:11434';
+
+$OLLAMA_MODEL =
+    $env['OLLAMA_MODEL']
+    ?? 'llama3.2:1b';
 
 $HUMAN_CONTACT =
     $env['HUMAN_CONTACT']
@@ -521,7 +509,7 @@ function mostrarMenu($chatId)
         . "1. Comparar vitaminas y nutrientes.\n"
         . "2. Conocer fuentes naturales.\n"
         . "3. Consultar para qué sirve un nutriente.\n"
-        . "4. Consultar la temperatura de una ciudad.\n\n"
+        . "4. Consultar la temperatura de una ciudad.\n"
         . "5. Solicitar una asesoria nutricional.\n\n"
 
         . "Elige una opción del menú o escribe tu consulta directamente.\n\n"
@@ -1007,6 +995,114 @@ function responderClima(
     );
 }
 
+/* =========================================================
+   OLLAMA - CONVERSACIÓN ABIERTA
+   ========================================================= */
+
+function consultarOllama($mensaje)
+{
+    global $OLLAMA_URL, $OLLAMA_MODEL;
+
+    $prompt =
+        "Eres NutriGuía, un asistente educativo sobre nutrición. "
+        . "Responde siempre en español, de forma breve, clara y amable. "
+        . "Usa como máximo tres párrafos cortos. "
+        . "No diagnostiques enfermedades. "
+        . "No indiques dosis de medicamentos o suplementos. "
+        . "No sustituyas la opinión de un profesional de salud. "
+        . "Si la pregunta requiere diagnóstico, tratamiento o dosis, "
+        . "indica que debe consultar a un profesional. "
+        . "No inventes información cuando no estés seguro.\n\n"
+        . "Pregunta del usuario:\n"
+        . $mensaje;
+
+    $datos = [
+        'model' => $OLLAMA_MODEL,
+        'prompt' => $prompt,
+        'stream' => false,
+        'keep_alive' => -1,
+
+        'options' => [
+            'temperature' => 0.4,
+            'num_predict' => 100
+        ]
+    ];
+
+    $curl = curl_init(
+        rtrim($OLLAMA_URL, '/')
+        . '/api/generate'
+    );
+
+    curl_setopt_array($curl, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => [
+            'Content-Type: application/json'
+        ],
+        CURLOPT_POSTFIELDS =>
+            json_encode(
+                $datos,
+                JSON_UNESCAPED_UNICODE
+            ),
+        CURLOPT_CONNECTTIMEOUT => 5,
+        CURLOPT_TIMEOUT => 90
+    ]);
+
+    $respuesta = curl_exec($curl);
+
+    if ($respuesta === false) {
+
+        logBot(
+            'ERROR',
+            'Ollama: ' . curl_error($curl)
+        );
+
+        curl_close($curl);
+
+        return null;
+    }
+
+    $codigo = curl_getinfo(
+        $curl,
+        CURLINFO_HTTP_CODE
+    );
+
+    curl_close($curl);
+
+    if ($codigo < 200 || $codigo >= 300) {
+
+        logBot(
+            'ERROR',
+            "Ollama respondió HTTP {$codigo}"
+        );
+
+        return null;
+    }
+
+    $json = json_decode(
+        $respuesta,
+        true
+    );
+
+    if (
+        !is_array($json)
+        ||
+        empty($json['response'])
+    ) {
+
+        logBot(
+            'ERROR',
+            'Ollama devolvió una respuesta inválida'
+        );
+
+        return null;
+    }
+
+    return trim(
+        $json['response']
+    );
+}
+
 
 /* =========================================================
    PROCESAR MENSAJE
@@ -1338,17 +1434,55 @@ if ($textoNormal === 'consultar clima') {
                     . "/clima San Salvador"
                 );
 
-            } else {
+            } 
 
-                enviarMensaje(
-                    $chatId,
+else {
 
-                    "No pude consultar el servicio "
-                    . "de clima en este momento.\n\n"
+    logBot(
+        'OLLAMA',
+        'Consulta abierta enviada al modelo local'
+    );
 
-                    . "Puedes intentarlo nuevamente más tarde."
-                );
-            }
+    $respuestaOllama =
+        consultarOllama(
+            $texto
+        );
+
+    if ($respuestaOllama !== null) {
+
+        enviarMensaje(
+            $chatId,
+
+            $respuestaOllama
+            . "\n\n"
+            . "¿Quieres realizar otra consulta?",
+
+            false,
+            true
+        );
+
+        esperarContinuacion(
+            $estado
+        );
+
+    } else {
+
+        enviarMensaje(
+            $chatId,
+
+            "No pude procesar la consulta abierta "
+            . "en este momento.\n\n"
+
+            . "Puedes usar las opciones del menú "
+            . "o intentarlo nuevamente más tarde.",
+
+            true
+        );
+
+        $estado =
+            nuevoEstado();
+    }
+}
 
 
             guardarEstados(
@@ -2563,24 +2697,53 @@ if ($textoNormal === 'consultar clima') {
 
 
     /* NO RECONOCIDO */
+else {
 
-    else {
+    logBot(
+        'OLLAMA',
+        'Consulta abierta enviada al modelo local'
+    );
 
-        errorIntento(
-            $chatId,
-            $estado,
-
-            "No pude identificar tu consulta.\n\n"
-
-            . "Puedes preguntarme, por ejemplo:\n"
-
-            . "• ¿Qué alimentos contienen vitamina B12?\n"
-            . "• ¿Para qué sirve la vitamina C?\n"
-            . "• Quiero comparar vitamina B y vitamina B12.\n\n"
-
-            . "También puedes usar /ayuda."
+    $respuestaOllama =
+        consultarOllama(
+            $texto
         );
+
+    if ($respuestaOllama !== null) {
+
+        enviarMensaje(
+            $chatId,
+
+            $respuestaOllama
+            . "\n\n"
+            . "¿Quieres realizar otra consulta?",
+
+            false,
+            true
+        );
+
+        esperarContinuacion(
+            $estado
+        );
+
+    } else {
+
+        enviarMensaje(
+            $chatId,
+
+            "No pude procesar la consulta abierta "
+            . "en este momento.\n\n"
+
+            . "Puedes usar las opciones del menú "
+            . "o intentarlo nuevamente más tarde.",
+
+            true
+        );
+
+        $estado =
+            nuevoEstado();
     }
+}
 
 
     guardarEstados(
