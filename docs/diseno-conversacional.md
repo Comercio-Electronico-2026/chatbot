@@ -37,10 +37,11 @@
 
 ### Escenarios Alternativos y Manejo de Errores
 
-- **Entrada de formato inválido:** Si el usuario ingresa letras o un número de orden que no contiene 4 dígitos, el bot explica el formato esperado y solicita el dato nuevamente.
-- **Recurso no encontrado:** Si la orden no existe en la base de datos o el producto no tiene stock, el bot notifica la ausencia y ofrece reintentar o volver al menú principal.
-- **Desvío / Cambio de tema:** Si el usuario saluda o pregunta otra cosa durante un flujo activo, el bot pregunta si desea cancelar la operación en curso antes de cambiar de contexto.
-- **Comandos globales de escape:** En cualquier etapa, las palabras "cancelar", "salir" o el comando `/cancel` abortan la operación y regresan al menú principal.
+- **Entrada de formato inválido:** Si el usuario ingresa letras o un número de orden que no contiene 4 dígitos, el bot explica el formato esperado y solicita el dato nuevamente. Tras **3 intentos fallidos**, ofrece hablar con un asesor o volver al menú principal.
+- **Recurso no encontrado:** Si la orden no existe en la base de datos o el producto no tiene stock, el bot notifica la ausencia y ofrece reintentar (máximo 3 intentos) o volver al menú principal; puede desviar a soporte humano.
+- **Fallo del backend / API:** Si la API de Pedidos o de Catálogo no responde o devuelve un error HTTP, el bot informa con un mensaje no técnico ("no pude conectarme con el sistema en este momento") y ofrece reintentar o regresar al menú.
+- **Desvío / Cambio de tema:** Si el usuario saluda o pregunta otra cosa durante un flujo activo, el bot pregunta si desea cancelar la operación en curso antes de cambiar de contexto. Si acepta, retoma desde el menú principal la nueva solicitud; si no, continúa pidiendo el dato que faltaba. Los comandos `/help` y `/cancel` se interceptan incluso mientras el bot espera un dato.
+- **Comandos globales de escape:** En cualquier etapa (incluida la captura de datos), las palabras "cancelar", "salir" o el comando `/cancel` abortan la operación y regresan al menú principal; `/help` o "ayuda" muestran las funciones disponibles sin perder el contexto.
 
 ### UI y Accesibilidad
 
@@ -93,42 +94,83 @@ flowchart TD
     Start([Inicio: /start]) --> Welcome[Bot: Saludo y presentación de opciones]
     Welcome --> Listen{Entrada del usuario}
 
-    %% Subflujo Cancelar / Ayuda
-    Listen -->|Comando /cancel o 'cancelar'| Reset[Bot: Operación cancelada. Regreso al inicio]
+    %% Intercepción global de /cancel y /help (también definida en ReadProd y ReadOrder)
+    Reset[Bot: Operación cancelada. Regreso al inicio]
     Reset --> Welcome
-    Listen -->|Comando /help o 'ayuda'| ShowHelp[Bot: Explica funciones y formatos aceptados]
+    ShowHelp[Bot: Explica funciones y formatos aceptados]
     ShowHelp --> Welcome
 
-    %% Subflujo Catálogo
-    Listen -->|Consultar catálogo| AskProduct[Bot: Solicita nombre de producto]
+    %% ========== Subrutina global de errores (limitada a 3 intentos) ==========
+    %% ErrFormat y NoProd incrementan un contador de intentos y llegan aquí.
+    CheckAttempts{¿Intentos < 3?}
+    CheckAttempts -->|Sí| RetryAsk[Bot: Solicita el dato nuevamente explicando el formato]
+    CheckAttempts -->|No| OfferHuman{Bot: Se agotaron los intentos. ¿Hablar con un asesor?}
+    RetryAsk -->|Cancela o pide ayuda| Reset
+    OfferHuman -->|Sí| CallSupport[Bot: Envía enlace de soporte y registra ticket]
+    OfferHuman -->|No| Welcome
+
+    Listen -->|"Pregunta otra cosa a mitad de flujo (cambio de tema)"| TopicChange
+
+    %% ========== Soporte humano (solicitar_soporte) ==========
+    Listen -->|"'Hablar con un asesor', 'contacto humano', 'queja'"| CallSupport
+    CallSupport --> ContinuePrompt
+
+    %% ========== Subflujo Catálogo ==========
+    Listen -->|"Consultar catálogo (sin nombrar producto)"| AskProduct[Bot: Solicita nombre de producto]
+    Listen -->|"Consultar catálogo con nombre incluido (ej. precio de teclado)"| CallCatAPI
     AskProduct --> ReadProd{Captura texto}
+
+    ReadProd -->|"/cancel, 'cancelar', 'salir'"| Reset
+    ReadProd -->|"/help, 'ayuda'"| ShowHelp
+    ReadProd -->|"Pregunta otro tema"| TopicChange
+    TopicChange -->|No, continúa con lo anterior| AskProduct
+
     ReadProd -->|Texto recibido| CallCatAPI[Consulta a API de Catálogo]
-    CallCatAPI --> CheckProd{¿Hay existencias?}
+    CallCatAPI -->|Error HTTP / sin respuesta| ApiFail[Bot: No pude conectarme con el sistema. Intenta de nuevo en unos minutos]
+    ApiFail -->|Acepta reintentar| CallCatAPI
+    ApiFail -->|No / vuelve al menú| Welcome
+    CallCatAPI --> CheckProd{¿Producto encontrado en catálogo?}
     CheckProd -->|Sí| ShowProd[Bot: Muestra precio y stock disponible]
-    CheckProd -->|No| NoProd[Bot: Sin coincidencias. Ofrece reintentar]
-    NoProd --> AskProduct
+    CheckProd -->|"No encontrado / sin stock"| NoProd[Bot: Sin coincidencias. Puedo buscar otro producto]
+    NoProd --> CheckAttempts
     ShowProd --> ContinuePrompt
 
-    %% Subflujo Pedido (Camino principal)
-    Listen -->|Rastrear pedido| AskOrder[Bot: Solicita número de pedido de 4 dígitos]
+    %% ========== Subflujo Pedido (camino principal) ==========
+    Listen -->|"Rastrear pedido (sin número)"| AskOrder[Bot: Solicita número de pedido de 4 dígitos]
+    Listen -->|"Rastrear pedido con número incluido (ej. pedido 4821)"| CallOrderAPI[Consulta a API de Pedidos]
     AskOrder --> ReadOrder{Captura de entrada}
 
-    ReadOrder -->|El usuario escribe 'cancelar'| Reset
-    ReadOrder -->|Entrada no numérica o != 4 dígitos| ErrFormat[Bot: Formato inválido. Debe contener 4 números]
-    ErrFormat --> AskOrder
+    ReadOrder -->|"El usuario escribe /cancel, 'cancelar' o 'salir'"| Reset
+    ReadOrder -->|"El usuario escribe /help o 'ayuda'"| ShowHelp
+    ReadOrder -->|"Pregunta otro tema"| TopicChange
+    TopicChange -->|Sí| Welcome
+    TopicChange -->|No, continúa con lo anterior| AskOrder
 
-    ReadOrder -->|Formato válido: 4 dígitos| CallOrderAPI[Consulta a API de Pedidos]
+    ReadOrder -->|Entrada no numérica o diferente de 4 dígitos| ErrFormat[Bot: Formato inválido. El pedido debe tener 4 dígitos]
+    ErrFormat --> CheckAttempts
+
+    ReadOrder -->|Formato válido: 4 dígitos| CallOrderAPI
+    CallOrderAPI -->|Error HTTP / sin respuesta| ApiFail
+    ApiFail -->|Acepta reintentar| CallOrderAPI
     CallOrderAPI --> CheckOrder{¿Pedido registrado?}
 
     CheckOrder -->|No encontrado en API| OrderNotFound[Bot: Pedido no existe. Verifica tu comprobante]
-    OrderNotFound --> RetryPrompt{¿Intentar nuevamente?}
-    RetryPrompt -->|Sí| AskOrder
-    RetryPrompt -->|No| Welcome
+    OrderNotFound --> CheckAttempts
 
     CheckOrder -->|Encontrado con éxito| ShowTracking[Bot: Muestra estado actual y fecha estimada]
-    ShowTracking --> ContinuePrompt{Bot: ¿Deseas consultar algo más?}
+    ShowTracking --> ContinuePrompt
 
+    %% ========== Ciclo de cierre de la conversación ==========
+    ContinuePrompt{Bot: ¿Deseas consultar algo más?}
     ContinuePrompt -->|Sí| Welcome
     ContinuePrompt -->|No| GoodBye[Bot: Despedida y cierre de sesión]
     GoodBye --> End([Fin de la sesión])
 ```
+
+**Notas del diagrama:**
+
+- **Contador de intentos:** `ErrFormat` (formato inválido) y `NoProd` (no encontrado) comparten la subrutina `CheckAttempts`; al tercero, el bot ofrece derivar a un asesor (`CallSupport`) o volver al menú, evitando bucles infinitos.
+- **Intercepción global:** durante cualquier captura de datos (`ReadOrder`, `ReadProd`) y en cada espera de entrada, `/cancel` y `/help` se detectan _antes_ de validar el formato del dato, por lo que niega el problema del dato tratado como inválido.
+- **Slot filling:** si la intención llegó con el dato ya incluido ("rastrear pedido 4821", "precio de teclado"), el flujo salta directamente a la consulta a la API, sin volver a pedir el dato.
+- **Fallo de API:** tanto la API de Pedidos como la de Catálogo tienen una rama `ApiFail` con mensaje no técnico, opción de reintentar o regresar al menú.
+- **Cambio de tema:** mientras el bot espera un dato, una entrada que corresponde a otra intención llega a `TopicChange`, que confirma si se abandona la operación actual antes de redirigir al menú.
