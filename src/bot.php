@@ -210,8 +210,12 @@ function procesarUpdate($update, $apiUrl, $storeApiBase, $soporteEmail, $groqApi
 
 // ==========================================
 // CONTROLADOR DUAL (WEBHOOK VS LONG POLLING)
+$stateFile = sys_get_temp_dir() . '/michu_user_state.json';
+if (file_exists($stateFile)) {
+    $userState = json_decode(file_get_contents($stateFile), true) ?: [];
+}
+
 if (php_sapi_name() !== 'cli') {
-    // Modo Webhook vía HTTP POST de Telegram
     $secretHeader = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '';
     if (!empty($expectedSecret) && $secretHeader !== $expectedSecret) {
         http_response_code(403);
@@ -223,6 +227,7 @@ if (php_sapi_name() !== 'cli') {
 
     if ($update) {
         procesarUpdate($update, $apiUrl, $storeApiBase, $soporteEmail, $groqApiKey, $userState);
+        file_put_contents($stateFile, json_encode($userState));
     }
 
     http_response_code(200);
@@ -312,7 +317,7 @@ function consultarLlm($apiKey, $userPrompt, $userName) {
             ["role" => "user", "content" => $userPrompt]
         ],
         "temperature" => 0.6,
-        "max_tokens" => 200
+        "max_tokens" => 500
     ];
 
     $ch = curl_init($url);
