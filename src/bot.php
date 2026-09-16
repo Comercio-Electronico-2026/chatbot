@@ -1,103 +1,143 @@
 <?php
-// Leer la variable de entorno desde el archivo .env
-if (!file_exists('.env')) {
-    die("Error: No se encontró el archivo .env. Por favor créalo y añade tu BOT_TOKEN.\n");
-}
-
-$config = parse_ini_file('.env');
-$token = $config['BOT_TOKEN'] ?? null;
-
-if (!$token) {
-    die("Error: BOT_TOKEN no está definido dentro del archivo .env.\n");
-}
-
-$apiUrl = "https://api.telegram.org/bot{$token}/";
-$offset = 0;
-
-echo "======================================\n";
-echo " Bot de Telegram iniciado correctamente\n";
-echo " Escuchando consultas de la Tienda Gaming...\n";
-echo "======================================\n";
-
-// Bucle infinito para consultar mensajes en tiempo real
-while (true) {
-    $response = @file_get_contents($apiUrl . "getUpdates?offset={$offset}&timeout=5");
-    
-    if ($response === FALSE) {
-        sleep(2);
-        continue;
+function loadEnv($path) {
+    if (!file_exists($path)) return;
+    $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        if (strpos(trim($line), '#') === 0) continue;
+        list($name, $value) = explode('=', $line, 2);
+        $_ENV[trim($name)] = trim($value);
     }
-    
-    $data = json_decode($response, true);
-
-    if (!empty($data['result'])) {
-        foreach ($data['result'] as $update) {
-            $offset = $update['update_id'] + 1;
-
-            if (isset($update['message']['text'])) {
-                $chatId = $update['message']['chat']['id'];
-                $text = trim($update['message']['text']);
-                $textLower = strtolower($text);
-                $nombreUsuario = $update['message']['from']['first_name'] ?? 'Usuario';
-
-                echo "Mensaje recibido de {$nombreUsuario}: '{$text}'\n";
-
-                // Evaluador de Intenciones
-                if ($textLower === '/start') {
-                    $respuesta = "¡Hola, {$nombreUsuario}! 👋 Bienvenido a nuestra tienda de accesorios de tecnología y gaming. 🎮\n\n"
-                        . "Puedo ayudarte a consultar precios, catálogo y disponibilidad de nuestros productos.\n\n"
-                        . "Por ejemplo, puedes preguntar:\n"
-                        . "- ¿Tienen audífonos bluetooth?\n"
-                        . "- ¿Cuánto cuesta el teclado mecánico?\n"
-                        . "- Escribe /catalogo para ver todos los productos\n"
-                        . "- Escribe /help para ver las opciones de ayuda";
-                } 
-                elseif ($textLower === '/catalogo' || strpos($textLower, 'catalogo') !== false) {
-                    $respuesta = "🛍️ *Catálogo de Productos Disponibles:*\n\n"
-                        . "1. *Audífonos Inalámbricos Bluetooth Pro* - $40.00 (Disponible)\n"
-                        . "2. *Hub USB-C Multiport 7 en 1* - $38.00 (Disponible)\n"
-                        . "3. *Mouse Gamer Óptico 7200 DPI* - $28.00 (Disponible)\n"
-                        . "4. *Teclado Mecánico Gaming RGB* - $65.00 (Disponible)\n\n"
-                        . "¿Deseas información de algún producto en específico?";
-                } 
-                elseif (strpos($textLower, 'audifono') !== false || strpos($textLower, 'bluetooth') !== false) {
-                    $respuesta = "🎧 *Audífonos Inalámbricos Bluetooth Pro*\n• Precio: *$40.00*\n• Estado: *Disponible en stock*";
-                } 
-                elseif (strpos($textLower, 'hub') !== false || strpos($textLower, 'usb') !== false) {
-                    $respuesta = "🔌 *Hub USB-C Multiport 7 en 1*\n• Precio: *$38.00*\n• Estado: *Disponible en stock*";
-                } 
-                elseif (strpos($textLower, 'mouse') !== false || strpos($textLower, 'raton') !== false) {
-                    $respuesta = "🖱️ *Mouse Gamer Óptico 7200 DPI*\n• Precio: *$28.00*\n• Estado: *Disponible en stock*";
-                } 
-                elseif (strpos($textLower, 'teclado') !== false) {
-                    $respuesta = "⌨️ *Teclado Mecánico Gaming RGB*\n• Precio: *$65.00*\n• Estado: *Disponible en stock*";
-                } 
-                elseif ($textLower === '/help' || strpos($textLower, 'ayuda') !== false) {
-                    $respuesta = "📌 *Guía de Comandos y Ayuda:*\n\n"
-                        . "• `/catalogo` - Lista completa de productos\n"
-                        . "• Escribe el nombre de un periférico (ej: *audifonos*, *teclado*, *mouse*, *hub*)\n"
-                        . "• `/start` - Menú de bienvenida";
-                } 
-                elseif (strpos($textLower, 'hola') !== false) {
-                    $respuesta = "¡Hola, {$nombreUsuario}! ¿En qué te puedo ayudar hoy? Escribe `/catalogo` para ver nuestros periféricos.";
-                } 
-                else {
-                    $respuesta = "Lo siento, no entendí tu consulta. 🤔\n\nPrueba escribiendo `/catalogo` para ver nuestros productos o `/help` para recibir ayuda.";
-                }
-
-                // Enviar respuesta a Telegram
-                $parametros = http_build_query([
-                    'chat_id' => $chatId,
-                    'text' => $respuesta,
-                    'parse_mode' => 'Markdown'
-                ]);
-                
-                @file_get_contents($apiUrl . "sendMessage?{$parametros}");
-                echo "-> Respuesta enviada a {$nombreUsuario}\n";
-            }
-        }
-    }
-    sleep(1);
 }
-?>
-EOF
+loadEnv(__DIR__ . '/../.env');
+
+$token = $_ENV['BOT_TOKEN'] ?? '';
+if (empty($token)) {
+    die("Error: BOT_TOKEN no configurado en .env\n");
+}
+
+define('API_URL', "https://api.telegram.org/bot{$token}/");
+define('LOG_FILE', __DIR__ . '/../logs/bot.log');
+define('SESSION_FILE', __DIR__ . '/../logs/sessions.json');
+define('INTERNAL_API_URL', 'https://tiendarc22009.duckdns.org/src/api.php');
+if (!is_dir(__DIR__ . '/../logs')) {
+    mkdir(__DIR__ . '/../logs', 0755, true);
+}
+
+function writeLog($message) {
+    $date = date('Y-m-d H:i:s');
+    file_put_contents(LOG_FILE, "[$date] $message\n", FILE_APPEND);
+}
+
+function getSession($chatId) {
+    if (!file_exists(SESSION_FILE)) return ['attempts' => 0];
+    $sessions = json_decode(file_get_contents(SESSION_FILE), true);
+    return $sessions[$chatId] ?? ['attempts' => 0];
+}
+
+function saveSession($chatId, $data) {
+    $sessions = file_exists(SESSION_FILE) ? json_decode(file_get_contents(SESSION_FILE), true) : [];
+    $sessions[$chatId] = $data;
+    file_put_contents(SESSION_FILE, json_encode($sessions));
+}
+
+function sendMessage($chatId, $text, $keyboard = null) {
+    $data = [
+        'chat_id' => $chatId,
+        'text' => $text,
+        'parse_mode' => 'Markdown'
+    ];
+    if ($keyboard) {
+        $data['reply_markup'] = json_encode($keyboard);
+    }
+
+    $ch = curl_init(API_URL . 'sendMessage');
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
+    $response = curl_exec($ch);
+    curl_close($ch);
+
+    writeLog("OUT -> Chat {$chatId}: {$text}");
+    return $response;
+}
+
+function callApiEndpoint($query) {
+    $url = INTERNAL_API_URL . '?query=' . urlencode($query);
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+    $response = curl_exec($ch);
+    curl_close($ch);
+
+    return json_decode($response, true);
+}
+
+$mainKeyboard = [
+    'keyboard' => [
+        [['text' => '🎧 Audífonos'], ['text' => '⌨️ Teclado']],
+        [['text' => '🖱️ Mouse'], ['text' => '🔌 Hub USB-C']],
+        [['text' => '/help'], ['text' => '/cancelar'], ['text' => '👤 Hablar con agente']]
+    ],
+    'resize_keyboard' => true
+];
+
+$input = file_get_contents('php://input');
+$update = json_decode($input, true);
+
+if (!$update || !isset($update['message'])) {
+    exit("Esperando mensajes de Telegram...");
+}
+
+$message = $update['message'];
+$chatId = $message['chat']['id'];
+$text = trim($message['text'] ?? '');
+
+writeLog("IN <- Chat {$chatId}: {$text}");
+$session = getSession($chatId);
+
+// Comandos Globales
+if (strtolower($text) === '/start') {
+    saveSession($chatId, ['attempts' => 0]);
+    sendMessage($chatId, "¡Hola! Bienvenido a la *Tienda Gaming*.\nPuedo ayudarte a consultar precios y disponibilidad de accesorios.\n\nEscribe el producto que buscas o selecciona una opción:", $mainKeyboard);
+    exit();
+}
+
+if (strtolower($text) === '/cancelar' || strtolower($text) === 'salir') {
+    saveSession($chatId, ['attempts' => 0]);
+    sendMessage($chatId, "Operación cancelada. Escribe /start cuando desees realizar otra consulta.");
+    exit();
+}
+
+if (strtolower($text) === '/help' || strtolower($text) === 'ayuda') {
+    sendMessage($chatId, "📌 *Menú de Ayuda*\n- Escribe el producto que buscas (*teclado*, *audífonos*, *mouse*).\n- Usa /cancelar para detener una consulta.", $mainKeyboard);
+    exit();
+}
+
+if (strtolower($text) === 'hablar con agente' || strtolower($text) === 'humano') {
+    saveSession($chatId, ['attempts' => 0]);
+    sendMessage($chatId, "🤝 Te estamos transfiriendo con un agente humano. Por favor espera un momento...");
+    exit();
+}
+
+// Consulta a la nueva API JSON
+$apiResult = callApiEndpoint($text);
+
+if (isset($apiResult['status']) && $apiResult['status'] === 'success') {
+    saveSession($chatId, ['attempts' => 0]);
+    sendMessage($chatId, $apiResult['text'], $mainKeyboard);
+    exit();
+}
+
+// Manejo de Errores (3 Intentos)
+$session['attempts']++;
+saveSession($chatId, $session);
+
+if ($session['attempts'] < 3) {
+    $remaining = 3 - $session['attempts'];
+    sendMessage($chatId, "⚠️ Opción no reconocida. Intenta buscando *mouse*, *teclado* o *audífonos* (Intentos restantes: {$remaining}).", $mainKeyboard);
+} else {
+    saveSession($chatId, ['attempts' => 0]);
+    sendMessage($chatId, "❌ Has excedido los 3 intentos. ¿Deseas reiniciar o hablar con un agente humano?", [
+        'keyboard' => [[['text' => '/start'], ['text' => 'Hablar con agente']]],
+        'resize_keyboard' => true
+    ]);
+}
