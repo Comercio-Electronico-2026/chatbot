@@ -183,7 +183,7 @@ flowchart TD
     Z{"¿Necesitas algo más?"}
     Z -->|Sí| B
     Z -->|No| M["Despedida: ¡Gracias por visitar PokeThings! Atrápalos a todos 🎴"]
-
+```
 ---
 
 ### Diálogo de muestra (camino feliz)
