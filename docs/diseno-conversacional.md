@@ -6,13 +6,13 @@
 
 Su objetivo principal es permitir que los clientes busquen productos y consulten sus precios de forma rápida desde Telegram, sin necesidad de recorrer manualmente todo el catálogo de la tienda web.
 
-En esta versión, el bot consultará la API REST de WooCommerce para obtener información real del catálogo. Además, utilizará un modelo local mediante Ollama para responder consultas abiertas relacionadas con herramientas y ferretería.
+En esta versión, el bot consultará la API REST de WooCommerce para obtener información real del catálogo. Además, utilizará un modelo de OpenAI mediante su API para responder consultas abiertas relacionadas con herramientas y ferretería.
 
 FerreBot seguirá un enfoque híbrido:
 
 - Las búsquedas de productos y precios se resolverán con la API de WooCommerce.
 - Los comandos y acciones de control se resolverán mediante reglas.
-- Las consultas abiertas relacionadas con ferretería se enviarán a Ollama.
+- Las consultas abiertas relacionadas con ferretería se enviarán a OpenAI mediante su API.
 - Los temas fuera de alcance se rechazarán de forma clara.
 - Si el usuario no puede completar una interacción después de varios intentos, se ofrecerá derivación a una persona.
 
@@ -34,7 +34,7 @@ Actualmente, un cliente que desea conocer el precio de un producto debe buscarlo
 
 FerreBot permitirá realizar esta consulta directamente desde Telegram escribiendo el nombre del producto.
 
-También podrá responder preguntas generales relacionadas con herramientas y ferretería mediante un modelo local, siempre que no se trate de precios, existencias o información que deba verificarse en WooCommerce.
+También podrá responder preguntas generales relacionadas con herramientas y ferretería mediante OpenAI, siempre que no se trate de precios, existencias o información que deba verificarse en WooCommerce.
 
 Esto busca reducir el tiempo necesario para encontrar información básica del catálogo y resolver dudas sencillas.
 
@@ -76,7 +76,7 @@ Ejemplos de consultas que el usuario podría realizar:
 El bot tendrá dos tipos principales de respuesta:
 
 1. Consultas sobre productos y precios: se responderán usando WooCommerce.
-2. Consultas abiertas relacionadas con ferretería: se responderán usando Ollama.
+2. Consultas abiertas relacionadas con ferretería: se responderán usando OpenAI.
 
 Si el usuario realiza una pregunta fuera de este alcance, FerreBot le explicará qué funciones tiene disponibles.
 
@@ -92,7 +92,7 @@ Si el usuario realiza una pregunta fuera de este alcance, FerreBot le explicará
 | Varios productos encontrados | Lista de opciones |
 | Producto no encontrado | Texto |
 | Entrada incorrecta | Texto de orientación |
-| Consulta abierta de ferretería | Texto generado por Ollama |
+| Consulta abierta de ferretería | Texto generado por OpenAI |
 | Solicitud de ayuda | Texto |
 | Cancelación | Texto y regreso al inicio |
 | Solicitud de atención humana | Texto de derivación |
@@ -134,7 +134,7 @@ Se espera que los usuarios tengan experiencia utilizando aplicaciones de mensaje
 | Consultar precio | ¿Cuánto cuesta el martillo? | Alta | 1 | Nombre del producto / API de WooCommerce |
 | Elegir entre resultados | Quiero el segundo | Media | 2 | Lista de resultados obtenidos |
 | Producto no encontrado | Busco un producto que no existe | Media | 2 | API de WooCommerce |
-| Consulta abierta de ferretería | ¿Para qué sirve una llave Allen? | Media | 2 | Ollama |
+| Consulta abierta de ferretería | ¿Para qué sirve una llave Allen? | Media | 2 | API de OpenAI |
 | Solicitar ayuda | `/ayuda` o "ayuda" | Baja | 3 | No requiere API |
 | Cancelar búsqueda | `/cancelar` o "cancelar" | Baja | 3 | No requiere API |
 | Volver al inicio | Quiero regresar | Baja | 3 | No requiere API |
@@ -218,7 +218,7 @@ Ejemplo:
 
 **Usuario:** Mejor dime para qué sirve una llave Allen.
 
-Si la nueva consulta está relacionada con ferretería, podrá enviarse a Ollama.
+Si la nueva consulta está relacionada con ferretería, podrá enviarse a OpenAI.
 
 Si el cambio de tema implica abandonar una búsqueda en curso, el bot confirmará o cancelará el estado anterior antes de continuar cuando sea necesario.
 
@@ -226,7 +226,7 @@ Si el cambio de tema implica abandonar una búsqueda en curso, el bot confirmar�
 
 ## Consulta abierta relacionada con ferretería
 
-Las preguntas generales relacionadas con herramientas o reparaciones básicas podrán ser enviadas a Ollama.
+Las preguntas generales relacionadas con herramientas o reparaciones básicas podrán ser enviadas a OpenAI mediante su API.
 
 Ejemplo:
 
@@ -234,7 +234,7 @@ Ejemplo:
 
 **Bot:** Una llave Allen se utiliza para apretar o aflojar tornillos con una cavidad hexagonal en la cabeza.
 
-Ollama no deberá inventar precios, existencias o disponibilidad de productos.
+OpenAI no deberá inventar precios, existencias o disponibilidad de productos.
 
 Si una consulta requiere información del catálogo, FerreBot deberá utilizar WooCommerce.
 
@@ -292,9 +292,9 @@ El término de búsqueda se conservará para que el usuario no tenga que escribi
 
 ---
 
-## Error al consultar Ollama
+## Error al consultar OpenAI
 
-Si Ollama no responde, FerreBot informará que la consulta abierta no puede procesarse temporalmente.
+Si OpenAI no responde, FerreBot informará que la consulta abierta no puede procesarse temporalmente.
 
 Ejemplo:
 
@@ -390,11 +390,11 @@ flowchart TD
     AC -- Sí --> I
     AC -- No --> C
 
-    F -- Consulta abierta de ferretería --> AD[Enviar consulta a Ollama]
+    F -- Consulta abierta de ferretería --> AD[Enviar consulta a OpenAI]
 
-    AD --> AE{¿Ollama respondió?}
+    AD --> AE{¿OpenAI respondió?}
 
-    AE -- Sí --> AF[Mostrar respuesta de Ollama]
+    AE -- Sí --> AF[Mostrar respuesta de OpenAI]
     AF --> C
 
     AE -- No --> AG[Informar que la consulta no puede procesarse temporalmente]
@@ -513,7 +513,7 @@ Se evaluarán los siguientes aspectos:
 - Facilidad para obtener ayuda.
 - Comprensión de los mensajes de error.
 - Comportamiento después de tres intentos inválidos.
-- Claridad de las respuestas generadas por Ollama.
+- Claridad de las respuestas generadas por OpenAI.
 
 Una prueba será considerada exitosa si el usuario puede completar la búsqueda de un producto sin recibir instrucciones adicionales de otra persona.
 
@@ -525,12 +525,12 @@ Se comprobarán los siguientes aspectos técnicos:
 
 - Tiempo de respuesta del bot.
 - Tiempo de respuesta de la API de WooCommerce.
-- Tiempo de respuesta de Ollama.
+- Tiempo de respuesta de OpenAI.
 - Correcto funcionamiento de las búsquedas.
 - Comportamiento cuando un producto no existe.
 - Comportamiento cuando existen múltiples coincidencias.
 - Comportamiento cuando la API no responde.
-- Comportamiento cuando Ollama no responde.
+- Comportamiento cuando OpenAI no responde.
 - Correcto funcionamiento con varias consultas consecutivas.
 - Funcionamiento de los reintentos.
 - Correcto funcionamiento de los comandos globales.
@@ -554,7 +554,7 @@ Para buscar productos, consultar precios o responder preguntas generales no ser�
 
 El bot únicamente necesitará procesar información necesaria para mantener la conversación y realizar la búsqueda o consulta.
 
-Las consultas abiertas enviadas a Ollama serán procesadas en infraestructura propia y no deberán incluir información personal que no sea necesaria.
+Las consultas abiertas se enviarán a la API de OpenAI para generar la respuesta. FerreBot no deberá solicitar ni incluir información personal que no sea necesaria para resolver la consulta.
 
 ---
 
@@ -591,7 +591,7 @@ Podrá:
 - Consultar precios.
 - Mostrar productos similares.
 - Informar cuando no existen resultados.
-- Responder preguntas básicas relacionadas con herramientas y ferretería mediante Ollama.
+- Responder preguntas básicas relacionadas con herramientas y ferretería mediante OpenAI.
 - Mostrar ayuda.
 - Cancelar una búsqueda.
 - Volver al inicio.
@@ -607,7 +607,7 @@ En esta primera versión no realizará:
 - Confirmación de inventario si WooCommerce no proporciona ese dato.
 - Respuestas sobre temas completamente ajenos a la ferretería.
 
-Los precios, productos y disponibilidad nunca serán inventados por Ollama. Cuando una consulta dependa del catálogo, FerreBot deberá utilizar WooCommerce.
+Los precios, productos y disponibilidad nunca serán inventados por OpenAI. Cuando una consulta dependa del catálogo, FerreBot deberá utilizar WooCommerce.
 
 Esta versión no ejecuta acciones irreversibles, por lo que no requiere confirmaciones de pagos, compras o cancelaciones de pedidos.
 ---
@@ -649,5 +649,5 @@ Esta versión no ejecuta acciones irreversibles, por lo que no requiere confirma
 - Se hicieron `/ayuda` y `/cancelar` comandos globales disponibles durante cualquier estado de la conversación, a partir de la observación 5 de HV21011.
 - Se agregó validación cuando el usuario selecciona una opción de una lista de productos.
 - Se modificó el manejo del fallo de WooCommerce para conservar el término de búsqueda y permitir reintentar.
-- Se agregó la integración de Ollama para consultas abiertas relacionadas con ferretería, manteniendo WooCommerce como fuente de verdad para productos y precios.
-- Se agregó el manejo del caso en que Ollama no responda.
+- Se agregó la integración de OpenAI para consultas abiertas relacionadas con ferretería, manteniendo WooCommerce como fuente de verdad para productos y precios.
+- Se agregó el manejo del caso en que OpenAI no responda.
