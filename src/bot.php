@@ -110,10 +110,15 @@ function consultarAPI($numero) {
         $estado = $datos['status'];
         $total = $datos['total'];
 
-        // Extraemos el primer producto de la orden
-        $producto = "tu orden";
+	// Extraemos todos los productos de la orden con sus cantidades
         if (!empty($datos['line_items'])) {
-            $producto = $datos['line_items'][0]['name'];
+            $lista_productos = [];
+            foreach ($datos['line_items'] as $item) {
+                $lista_productos[] = $item['quantity'] . "x " . $item['name'];
+            }
+            $producto = implode(", ", $lista_productos);
+        } else {
+            $producto = "tu orden";
         }
 
         // Diccionario para traducir los estados de WooCommerce al español
