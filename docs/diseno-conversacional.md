@@ -312,39 +312,51 @@ Ejemplo:
 
 La derivación no implica que FerreBot invente un agente disponible. El bot únicamente indicará el medio de contacto definido para la tienda cuando ese dato esté configurado.
 
+Para continuar con una persona, comunícate con:
+WhatsApp: XXXXXXXX
 ---
-
 # 5. Diagrama de flujo de la conversación
 
 ```mermaid
 flowchart TD
 
-    A[Usuario envía mensaje] --> B{¿Comando global?}
+    A[Usuario envía un mensaje] --> B{¿Es un comando global?}
 
     B -- /start --> C[Mostrar bienvenida y opciones]
-    B -- /ayuda --> D[Mostrar ayuda]
-    B -- /cancelar --> E[Cancelar flujo actual y volver al inicio]
-    B -- No --> F{¿Qué intención detecta el bot?}
+    C --> A
 
-    D --> G[Continuar desde el estado actual]
+    B -- /ayuda --> D[Mostrar ayuda sin perder el estado actual]
+    D --> A
+
+    B -- /cancelar --> E[Cancelar el flujo actual]
     E --> C
 
-    F -- Buscar producto o precio --> H{¿El mensaje ya contiene el producto?}
-    H -- Sí --> I[Guardar nombre del producto]
-    H -- No --> J[Preguntar qué producto busca]
+    B -- No --> F{¿Qué intención tiene el usuario?}
 
-    J --> K{¿Entrada válida?}
-    K -- Sí --> I
+    F -- Buscar producto o precio --> G{¿Ya escribió el nombre del producto?}
+    F -- Volver al inicio --> C
+	
+    G -- Sí --> H[Guardar término de búsqueda]
+    G -- No --> I[Preguntar qué producto busca]
+
+    I --> J[Usuario responde]
+    J --> K{¿La entrada es válida?}
+
+    K -- Sí --> H
     K -- No --> L[Incrementar contador de intentos]
-    L --> M{¿Intentos menores a 3?}
-    M -- Sí --> J
-    M -- No --> N[Ofrecer volver al inicio o atención humana]
 
-    I --> O[Consultar API de WooCommerce]
-    O --> P{¿La API respondió?}
+    L --> M{¿Lleva menos de 3 intentos?}
 
-    P -- No --> Q[Informar fallo temporal]
+    M -- Sí --> I
+    M -- No --> N[Ofrecer volver al inicio o hablar con una persona]
+
+    H --> O[Consultar API REST de WooCommerce]
+
+    O --> P{¿La API respondió correctamente?}
+
+    P -- No --> Q[Informar problema temporal sin mostrar error técnico]
     Q --> R{¿Desea reintentar?}
+
     R -- Sí --> O
     R -- No --> C
 
@@ -352,43 +364,54 @@ flowchart TD
 
     S -- No --> T[Informar que no se encontraron resultados]
     T --> U{¿Desea buscar otro producto?}
-    U -- Sí --> J
+
+    U -- Sí --> I
     U -- No --> C
 
     S -- Sí --> V{¿Hay un solo resultado?}
 
-    V -- Sí --> W[Mostrar nombre y precio]
+    V -- Sí --> W[Mostrar nombre y precio del producto]
+
     V -- No --> X[Mostrar lista numerada de productos]
     X --> Y[Usuario selecciona una opción]
-    Y --> Z{¿Selección válida?}
+
+    Y --> Z{¿La selección es válida?}
 
     Z -- Sí --> W
     Z -- No --> AA[Incrementar contador de intentos]
-    AA --> AB{¿Intentos menores a 3?}
+
+    AA --> AB{¿Lleva menos de 3 intentos?}
+
     AB -- Sí --> X
     AB -- No --> N
 
     W --> AC{¿Desea buscar otro producto?}
-    AC -- Sí --> J
+
+    AC -- Sí --> I
     AC -- No --> C
 
     F -- Consulta abierta de ferretería --> AD[Enviar consulta a Ollama]
+
     AD --> AE{¿Ollama respondió?}
-    AE -- Sí --> AF[Mostrar respuesta]
-    AE -- No --> AG[Informar fallo temporal]
+
+    AE -- Sí --> AF[Mostrar respuesta de Ollama]
     AF --> C
+
+    AE -- No --> AG[Informar que la consulta no puede procesarse temporalmente]
     AG --> C
 
     F -- Hablar con una persona --> N
 
-    F -- Fuera de alcance --> AH[Explicar funciones disponibles]
+    F -- Fuera de alcance --> AH[Explicar qué funciones tiene FerreBot]
     AH --> C
 
     N --> AI{¿Qué desea hacer?}
-    AI -- Volver al inicio --> C
-    AI -- Atención humana --> AJ[Mostrar medio de contacto configurado]
-```
 
+    AI -- Volver al inicio --> C
+    AI -- Atención humana --> AJ[Mostrar medio de contacto de la tienda]
+
+    AJ --> C
+```
 ---
 
 # 6. Diálogo de muestra - Camino feliz
@@ -586,6 +609,7 @@ En esta primera versión no realizará:
 
 Los precios, productos y disponibilidad nunca serán inventados por Ollama. Cuando una consulta dependa del catálogo, FerreBot deberá utilizar WooCommerce.
 
+Esta versión no ejecuta acciones irreversibles, por lo que no requiere confirmaciones de pagos, compras o cancelaciones de pedidos.
 ---
 
 # 14. Evaluación de Diseño Conversacional (revisado por HV21011)
