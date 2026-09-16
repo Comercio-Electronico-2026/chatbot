@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+require_once __DIR__ . '/groq.php';
 
 // ----------------------------------------------------
 // Configuración
@@ -26,6 +27,11 @@ $apiUrl = 'https://api.telegram.org/bot' . $token;
 $wcConsumerKey = $env['WC_CONSUMER_KEY'] ?? '';
 $wcConsumerSecret = $env['WC_CONSUMER_SECRET'] ?? '';
 $webhookSecret = $env['TELEGRAM_WEBHOOK_SECRET'] ?? '';
+$groqApiKey = $env['GROQ_API_KEY'] ?? '';
+
+$groqModel =
+    $env['GROQ_MODEL']
+    ?? 'openai/gpt-oss-20b';
 
 $storeApiUrl =
     'https://tienda.hv21011.duckdns.org/wp-json/wc/store/v1/products';
@@ -172,12 +178,18 @@ function telegramRequest(
 function sendMessage(
     string|int $chatId,
     string $text,
-    ?array $replyMarkup = null
+    ?array $replyMarkup = null,
+    ?string $parseMode = null
 ): bool {
     $params = [
         'chat_id' => $chatId,
         'text' => $text,
     ];
+
+    if ($parseMode !== null) {
+        $params['parse_mode'] =
+            $parseMode;
+    }
 
     if ($replyMarkup !== null) {
         $params['reply_markup'] = json_encode(
@@ -1808,7 +1820,8 @@ function processUpdate(
                     "Parece que estamos teniendo problemas " .
                     "con la búsqueda.\n\n" .
                     "Puedes escribir /menu para volver " .
-                    "al menú o /soporte para recibir ayuda."
+                    "al menú,  /ayuda para revisar las opciones disponibles " .
+                    "o /soporte para recibir atención humana."
                 );
 
                 return;
@@ -1978,14 +1991,61 @@ function processUpdate(
 
 
     // ------------------------------------------------
-    // No reconocido / fuera de alcance
+    // Consulta abierta / fuera de alcance
     // ------------------------------------------------
 
-    $session['attempts']++;
+    global $groqApiKey;
+    global $groqModel;
 
+    // Un comando desconocido continúa usando
+    // el mecanismo tradicional de tres intentos.
     if (
-        $session['attempts']
-        >= 3
+        str_starts_with(
+            $message,
+            '/'
+        )
+    ) {
+        $session['attempts']++;
+
+        if (
+            $session['attempts']
+            >= 3
+        ) {
+            clearSession(
+                $chatId
+            );
+
+            sendMessage(
+                $chatId,
+                "No pude reconocer tus últimos comandos.\n\n" .
+                "Puedes escribir /menu para volver al menú, " .
+                "/ayuda para revisar las opciones disponibles " .
+                "o /soporte para comunicarte con atención humana."
+            );
+
+            return;
+        }
+
+        saveSession(
+            $chatId,
+            $session
+        );
+
+        sendMessage(
+            $chatId,
+            "No reconozco ese comando.\n\n" .
+            "Escribe /ayuda para ver las opciones disponibles."
+        );
+
+        return;
+    }
+
+
+    // Las consultas de pedidos se mantienen fuera del LLM.
+    if (
+        looksLikeOrderIntent(
+            $message
+        )
     ) {
         clearSession(
             $chatId
@@ -1993,26 +2053,103 @@ function processUpdate(
 
         sendMessage(
             $chatId,
-            "No pude reconocer tus últimos mensajes.\n\n" .
-            "Parece que tu consulta puede estar fuera " .
-            "de lo que MusicHub Bot puede resolver actualmente.\n\n" .
-            "Puedes escribir /menu para volver al menú, " .
-            "/ayuda para revisar las opciones disponibles " .
-            "o /soporte para comunicarte con atención humana."
+            "Puedo ayudarte con el estado de tu pedido 📦.\n\n" .
+            "Por seguridad, esa consulta se procesa directamente " .
+            "con la tienda y no con el asistente de IA.\n\n" .
+            "Escribe /pedido seguido del número.\n" .
+            "Por ejemplo: /pedido 17"
         );
 
         return;
     }
 
-    saveSession(
-        $chatId,
-        $session
+
+    // La solicitud de atención humana tampoco necesita IA.
+    if (
+        looksLikeHumanSupportIntent(
+            $message
+        )
+    ) {
+        clearSession(
+            $chatId
+        );
+
+        sendMessage(
+            $chatId,
+            getSupportText()
+        );
+
+        return;
+    }
+
+
+    // No enviamos posibles datos personales
+    // a un proveedor externo.
+    if (
+        containsPotentialPersonalData(
+            $message
+        )
+    ) {
+        clearSession(
+            $chatId
+        );
+
+        sendMessage(
+            $chatId,
+            "Para proteger tus datos, no enviaré ese mensaje " .
+            "al asistente de IA.\n\n" .
+            "Puedes usar /menu para consultar las opciones " .
+            "o /soporte si necesitas atención humana."
+        );
+
+        return;
+    }
+
+
+    // Conversación abierta -> Groq.
+    $aiResponse =
+        askGroq(
+            $message,
+            $groqApiKey,
+            $groqModel
+        );
+
+    if (
+        $aiResponse['status']
+        === 'success'
+    ) {
+        clearSession(
+            $chatId
+        );
+
+        sendMessage(
+            $chatId,
+            "🤖 " .
+            formatGroqForTelegram(
+                $aiResponse['text']
+            ),
+            null,
+            'HTML'
+        );
+
+        return;
+    }
+
+
+    // Si Groq falla, no contamos el problema
+    // como error cometido por el usuario.
+    clearSession(
+        $chatId
     );
 
     sendMessage(
         $chatId,
-        "No pude reconocer esa opción.\n\n" .
-        "Escribe /ayuda para ver lo que puedo hacer."
+        "En este momento no puedo responder consultas abiertas.\n\n" .
+        "Las funciones principales siguen disponibles:\n" .
+        "🛒 /catalogo\n" .
+        "📦 /pedido\n" .
+        "👤 /soporte\n" .
+        "🏠 /menu"
     );
 }
 
