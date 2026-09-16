@@ -6,7 +6,7 @@ declare(strict_types=1);
  * CitasBot - Clinica Sonrisa Sana.
  *
  * Regla: las acciones de citas se resuelven con codigo determinista.
- * Ollama solo atiende mensajes abiertos que no son acciones criticas.
+ * OpenAI solo atiende mensajes abiertos que no son acciones criticas.
  */
 
 const TELEGRAM_BASE = 'https://api.telegram.org';
@@ -29,8 +29,9 @@ function loadConfig(string $dir): array
 
     return [
         'token' => (string) $values['BOT_TOKEN'],
-        'ollama_url' => rtrim((string) ($values['OLLAMA_URL'] ?? 'http://127.0.0.1:11434'), '/'),
-        'ollama_model' => (string) ($values['OLLAMA_MODEL'] ?? 'qwen2.5:0.5b'),
+        'openai_key' => (string) ($values['OPENAI_API_KEY'] ?? ''),
+        'openai_url' => rtrim((string) ($values['OPENAI_URL'] ?? 'https://api.openai.com/v1/chat/completions'), '/'),
+        'openai_model' => (string) ($values['OPENAI_MODEL'] ?? 'gpt-5.6-luna'),
         'webhook_secret' => (string) ($values['WEBHOOK_SECRET'] ?? ''),
     ];
 }
@@ -580,26 +581,52 @@ function dentalPreparationMessage(): string
         . 'de la clinica. Si tienes una condicion especifica, confirmala con tu odontologo.';
 }
 
-function ollamaAnswer(string $text, array $config): ?string
+function openAiAnswer(string $text, array $config): ?string
 {
     $safeText = redactForModel($text);
-    if ($safeText === '') {
+    if ($safeText === '' || $config['openai_key'] === '') {
         return null;
     }
 
     $payload = [
-        'model' => $config['ollama_model'],
-        'stream' => false,
-        'prompt' => "Eres el asistente informativo de Clinica Sonrisa Sana. "
-            . "Responde en español, de forma breve y clara. No inventes citas, precios ni datos medicos. "
-            . "Si la persona necesita agendar, cancelar o reprogramar, indicale que use el menu del bot. "
-            . "Consulta del usuario: " . $safeText,
+        'model' => $config['openai_model'],
+        'max_completion_tokens' => 250,
+        'messages' => [
+            [
+                'role' => 'system',
+                'content' => 'Eres el asistente informativo de Clinica Sonrisa Sana. '
+                    . 'Responde en español, de forma breve, clara y prudente. '
+                    . 'No inventes citas, precios, diagnosticos ni datos medicos. '
+                    . 'Si la persona necesita agendar, cancelar o reprogramar, indicale que use el menu del bot. '
+                    . 'No solicites ni repitas datos personales.',
+            ],
+            ['role' => 'user', 'content' => $safeText],
+        ],
     ];
-    $response = httpJson($config['ollama_url'] . '/api/generate', $payload, 90);
-    if (empty($response['response'])) {
+    $curl = curl_init($config['openai_url']);
+    curl_setopt_array($curl, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_TIMEOUT => 90,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => json_encode($payload),
+        CURLOPT_HTTPHEADER => [
+            'Accept: application/json',
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $config['openai_key'],
+        ],
+    ]);
+    $rawResponse = curl_exec($curl);
+    $error = curl_error($curl);
+    curl_close($curl);
+
+    if ($rawResponse === false || $error !== '') {
         return null;
     }
-    return trim((string) $response['response']);
+
+    $response = json_decode((string) $rawResponse, true);
+    $answer = $response['choices'][0]['message']['content'] ?? null;
+    return is_string($answer) && trim($answer) !== '' ? trim($answer) : null;
 }
 
 function processMessage(string $token, array $config, array &$state, string $chatId, string $text): void
@@ -732,7 +759,7 @@ function processMessage(string $token, array $config, array &$state, string $cha
         return;
     }
 
-    $answer = ollamaAnswer($value, $config);
+    $answer = openAiAnswer($value, $config);
     sendMessage($token, $chatId, $answer ?? 'No pude responder esa consulta. Escribe /ayuda o elige una opcion del menu.', mainMenu());
 }
 

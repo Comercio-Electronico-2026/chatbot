@@ -5,10 +5,10 @@ Código del bot de Telegram (Lab 5b). Cada alumno trabaja en su rama
 
 ## Configuración local
 
-Copiar `.env.example` como `.env` y completar `BOT_TOKEN`. El modelo local se
-configura con `OLLAMA_URL` y `OLLAMA_MODEL`. Para webhook también se requiere un
-`WEBHOOK_SECRET` aleatorio. El bot usa reglas para las acciones críticas de citas
-y Ollama solo para consultas abiertas.
+Copiar `.env.example` como `.env` y completar `BOT_TOKEN` y `OPENAI_API_KEY`.
+El modelo se configura con `OPENAI_URL` y `OPENAI_MODEL`. Para webhook también se
+requiere un `WEBHOOK_SECRET` aleatorio. El bot usa reglas para las acciones críticas
+de citas y OpenAI solo para consultas abiertas.
 
 ## Ejecución
 

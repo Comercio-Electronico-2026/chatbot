@@ -5,8 +5,8 @@
 - PHP 8.4 con la extension cURL.
 - Telegram Bot API mediante webhook HTTPS en el despliegue.
 - Open-Meteo para geocodificacion y temperatura actual.
-- Ollama local en `http://127.0.0.1:11434`.
-- Modelo configurado: `qwen2.5:0.5b`.
+- API de OpenAI mediante HTTPS.
+- Modelo configurado: `gpt-5.6-luna`.
 
 ## Pruebas funcionales
 
@@ -22,20 +22,19 @@
 | Control de flujo | `/cancelar`, `/volver`, `/ayuda` | Interrumpe o conserva el paso segun corresponda | Pendiente de evidencia Telegram |
 | REST | `/clima San Salvador` | Temperatura y estado del cielo | Verificado contra Open-Meteo |
 | REST con error | `/clima CiudadInexistente` | Mensaje claro, sin error tecnico | Pendiente de evidencia Telegram |
-| Conversacion abierta | Pregunta no critica | Respuesta de Ollama o fallback claro | Verificado contra API local |
+| Conversacion abierta | Pregunta no critica | Respuesta de OpenAI o fallback claro | API verificada; pendiente de evidencia Telegram |
 
 ## Comprobaciones de despliegue
 
 ```bash
 php -l src/bot.php
 php -l src/webhook.php
-systemctl is-active ollama
 systemctl is-active nginx
 systemctl is-active php8.4-fpm
-curl http://127.0.0.1:11434/api/tags
+grep OPENAI_MODEL /home/as22027/chatbot/.env
 ```
 
-El token se mantiene en `.env`. El estado, el offset y los logs se mantienen en
+El token del bot y la clave de OpenAI se mantienen en `.env`. El estado, el offset y los logs se mantienen en
 archivos locales excluidos por `.gitignore`.
 
 ## Webhook HTTPS
