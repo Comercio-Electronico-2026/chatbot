@@ -1,5 +1,6 @@
 <?php
-// bot.php - Long Polling para responder a /start
+
+//EXTRAER TOKEN
 
 $envFile = dirname(__DIR__) . '/.env';
 if (file_exists($envFile)) {
@@ -22,6 +23,8 @@ if (!$botToken) {
 }
 
 $apiUrl = "https://api.telegram.org/bot{$botToken}/";
+
+
 
 // FUNCIONES DEL BOT
 
@@ -80,3 +83,20 @@ function mostrarMenu(int $chatId, string $nombre): void
 
     enviarMensaje($chatId, $mensaje);
 }
+
+
+// CONEXION DEL BOT CON EL TOKEN DE TELEGRAM
+
+$me = telegram('getMe');
+
+if (!$me || !($me['ok'] ?? false)) {
+    die("❌ Error: Token inválido o problema al conectar con Telegram.\n");
+}
+
+echo "✅ Bot conectado exitosamente: @"
+   . $me['result']['username']
+   . " (ID: "
+   . $me['result']['id']
+   . ")\n";
+
+echo "📡 Escuchando mensajes con Long Polling (Presiona Ctrl + C para salir)...\n\n";
