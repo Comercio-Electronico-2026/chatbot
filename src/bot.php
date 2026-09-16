@@ -34,10 +34,12 @@ $groqModel =
     ?? 'openai/gpt-oss-20b';
 
 $storeApiUrl =
-    'https://tienda.hv21011.duckdns.org/wp-json/wc/store/v1/products';
+    $env['STORE_API_URL']
+    ?? 'https://tienda.hv21011.duckdns.org/wp-json/wc/store/v1/products';
 
 $wooApiUrl =
-    'https://tienda.hv21011.duckdns.org/wp-json/wc/v3';
+    $env['WOO_API_URL']
+    ?? 'https://tienda.hv21011.duckdns.org/wp-json/wc/v3';
 
 $storageDirectory = dirname(__DIR__) . '/storage';
 $logDirectory = $storageDirectory . '/logs';
