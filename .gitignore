@@ -3,3 +3,5 @@
 vendor/
 node_modules/
 *.log
+storage/logs/*.log
+storage/sessions/*.json
