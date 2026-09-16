@@ -6,7 +6,15 @@
 
 Su objetivo principal es permitir que los clientes busquen productos y consulten sus precios de forma rápida desde Telegram, sin necesidad de recorrer manualmente todo el catálogo de la tienda web.
 
-En una etapa posterior, el bot utilizará la API de WooCommerce para consultar la información real de los productos.
+En esta versión, el bot consultará la API REST de WooCommerce para obtener información real del catálogo. Además, utilizará un modelo local mediante Ollama para responder consultas abiertas relacionadas con herramientas y ferretería.
+
+FerreBot seguirá un enfoque híbrido:
+
+- Las búsquedas de productos y precios se resolverán con la API de WooCommerce.
+- Los comandos y acciones de control se resolverán mediante reglas.
+- Las consultas abiertas relacionadas con ferretería se enviarán a Ollama.
+- Los temas fuera de alcance se rechazarán de forma clara.
+- Si el usuario no puede completar una interacción después de varios intentos, se ofrecerá derivación a una persona.
 
 ---
 
@@ -14,7 +22,7 @@ En una etapa posterior, el bot utilizará la API de WooCommerce para consultar l
 
 ## ¿Quién usará el chatbot?
 
-El chatbot estará dirigido principalmente a clientes generales de la ferretería que desean consultar productos y precios.
+El chatbot estará dirigido principalmente a clientes generales de la ferretería que desean consultar productos, precios o hacer preguntas básicas relacionadas con herramientas.
 
 No se espera que el usuario tenga conocimientos técnicos avanzados ni que conozca comandos complejos.
 
@@ -26,7 +34,9 @@ Actualmente, un cliente que desea conocer el precio de un producto debe buscarlo
 
 FerreBot permitirá realizar esta consulta directamente desde Telegram escribiendo el nombre del producto.
 
-Esto busca reducir el tiempo necesario para encontrar información básica del catálogo.
+También podrá responder preguntas generales relacionadas con herramientas y ferretería mediante un modelo local, siempre que no se trate de precios, existencias o información que deba verificarse en WooCommerce.
+
+Esto busca reducir el tiempo necesario para encontrar información básica del catálogo y resolver dudas sencillas.
 
 ---
 
@@ -39,9 +49,11 @@ Los usuarios necesitan:
 - Obtener resultados claros y fáciles de entender.
 - Saber cuando un producto no existe.
 - Elegir entre varios productos cuando existen coincidencias similares.
+- Hacer preguntas generales relacionadas con herramientas.
 - Poder realizar otra búsqueda.
 - Poder cancelar una búsqueda.
 - Obtener ayuda cuando no sepan cómo utilizar el bot.
+- Poder solicitar atención humana si el bot no puede resolver el problema.
 
 ---
 
@@ -54,11 +66,17 @@ Ejemplos de consultas que el usuario podría realizar:
 - Quiero buscar un taladro.
 - ¿Cuál es el precio de un serrucho?
 - Buscar martillo.
+- ¿Para qué sirve una llave Allen?
+- ¿Qué herramienta puedo usar para apretar una tuerca?
 - Quiero buscar un producto.
 - Ayuda.
 - Cancelar.
+- Quiero hablar con una persona.
 
-El alcance inicial del bot estará limitado a la búsqueda de productos y consulta de precios.
+El bot tendrá dos tipos principales de respuesta:
+
+1. Consultas sobre productos y precios: se responderán usando WooCommerce.
+2. Consultas abiertas relacionadas con ferretería: se responderán usando Ollama.
 
 Si el usuario realiza una pregunta fuera de este alcance, FerreBot le explicará qué funciones tiene disponibles.
 
@@ -74,8 +92,10 @@ Si el usuario realiza una pregunta fuera de este alcance, FerreBot le explicará
 | Varios productos encontrados | Lista de opciones |
 | Producto no encontrado | Texto |
 | Entrada incorrecta | Texto de orientación |
+| Consulta abierta de ferretería | Texto generado por Ollama |
 | Solicitud de ayuda | Texto |
 | Cancelación | Texto y regreso al inicio |
+| Solicitud de atención humana | Texto de derivación |
 
 ---
 
@@ -95,6 +115,7 @@ Diversa. El bot puede ser utilizado tanto por personas que realizan reparaciones
 - Materiales para reparaciones.
 - Productos de ferretería.
 - Consultar precios antes de realizar una compra.
+- Resolver dudas básicas sobre el uso de herramientas.
 
 ### Nivel de experiencia con tecnología
 
@@ -113,9 +134,11 @@ Se espera que los usuarios tengan experiencia utilizando aplicaciones de mensaje
 | Consultar precio | ¿Cuánto cuesta el martillo? | Alta | 1 | Nombre del producto / API de WooCommerce |
 | Elegir entre resultados | Quiero el segundo | Media | 2 | Lista de resultados obtenidos |
 | Producto no encontrado | Busco un producto que no existe | Media | 2 | API de WooCommerce |
+| Consulta abierta de ferretería | ¿Para qué sirve una llave Allen? | Media | 2 | Ollama |
 | Solicitar ayuda | `/ayuda` o "ayuda" | Baja | 3 | No requiere API |
 | Cancelar búsqueda | `/cancelar` o "cancelar" | Baja | 3 | No requiere API |
 | Volver al inicio | Quiero regresar | Baja | 3 | No requiere API |
+| Hablar con una persona | Quiero hablar con alguien | Baja | 3 | Derivación a humano |
 
 ---
 
@@ -153,6 +176,10 @@ Encontré varios productos:
 
 Selecciona una opción.
 
+Si el usuario escribe una opción que no existe, el bot volverá a mostrar las opciones disponibles.
+
+Después de tres selecciones inválidas consecutivas, el bot dejará de repetir la misma pregunta y ofrecerá volver al inicio o hablar con una persona.
+
 ---
 
 ## Entrada inválida
@@ -163,35 +190,79 @@ Ejemplo:
 
 **Bot:** Escribe el nombre del producto que deseas buscar.
 
+El bot contará los intentos inválidos.
+
+- Primer intento: volverá a explicar qué dato necesita.
+- Segundo intento: dará un ejemplo más concreto.
+- Tercer intento: ofrecerá volver al inicio o solicitar atención humana.
+
+---
+
+## Reutilización de datos ya proporcionados
+
+Si el usuario incluye el nombre del producto en su primer mensaje, FerreBot no volverá a preguntarlo.
+
+Ejemplo:
+
+**Usuario:** Quiero buscar un taladro.
+
+En este caso, el bot deberá utilizar directamente "taladro" como término de búsqueda y consultar WooCommerce.
+
 ---
 
 ## El usuario cambia de tema
 
-Si el usuario pregunta sobre algo fuera del alcance del bot, FerreBot no intentará responder información que no puede proporcionar.
+Si el usuario cambia de intención mientras el bot espera un dato, FerreBot intentará reconocer la nueva intención.
 
 Ejemplo:
 
-**Usuario:** ¿Cómo estará el clima mañana?
+**Usuario:** Mejor dime para qué sirve una llave Allen.
 
-**Bot:** Por el momento puedo ayudarte a buscar productos de la ferretería y consultar sus precios. Escribe el nombre de un producto o utiliza `/ayuda`.
+Si la nueva consulta está relacionada con ferretería, podrá enviarse a Ollama.
+
+Si el cambio de tema implica abandonar una búsqueda en curso, el bot confirmará o cancelará el estado anterior antes de continuar cuando sea necesario.
+
+---
+
+## Consulta abierta relacionada con ferretería
+
+Las preguntas generales relacionadas con herramientas o reparaciones básicas podrán ser enviadas a Ollama.
+
+Ejemplo:
+
+**Usuario:** ¿Para qué sirve una llave Allen?
+
+**Bot:** Una llave Allen se utiliza para apretar o aflojar tornillos con una cavidad hexagonal en la cabeza.
+
+Ollama no deberá inventar precios, existencias o disponibilidad de productos.
+
+Si una consulta requiere información del catálogo, FerreBot deberá utilizar WooCommerce.
+
+---
+
+## Fuera de alcance
+
+Si el usuario pregunta sobre un tema que no tiene relación con ferretería, productos o herramientas, FerreBot informará que no puede responder esa consulta.
+
+Ejemplo:
+
+**Usuario:** ¿Quién ganó el partido de ayer?
+
+**Bot:** Esa consulta está fuera de mi alcance. Puedo ayudarte a buscar productos, consultar precios o responder preguntas básicas relacionadas con herramientas.
 
 ---
 
 ## Cancelación
 
-Durante una búsqueda, el usuario podrá escribir:
+El comando `/cancelar` estará disponible en cualquier punto de la conversación.
 
-`/cancelar`
-
-El bot cancelará la búsqueda actual y regresará al menú principal.
+Al recibirlo, FerreBot cancelará el flujo actual y regresará al menú principal.
 
 ---
 
 ## Solicitud de ayuda
 
-El usuario podrá escribir:
-
-`/ayuda`
+El comando `/ayuda` estará disponible en cualquier punto de la conversación.
 
 El bot mostrará una explicación breve sobre sus funciones.
 
@@ -199,9 +270,13 @@ Ejemplo:
 
 **Bot:**
 
-Puedo ayudarte a buscar productos y consultar sus precios.
+Puedo ayudarte a:
 
-Escribe el nombre del producto que buscas o utiliza `/start` para volver al inicio.
+- Buscar productos.
+- Consultar precios.
+- Responder preguntas básicas de ferretería.
+- Cancelar una operación con `/cancelar`.
+- Volver al inicio con `/start`.
 
 ---
 
@@ -211,7 +286,31 @@ Si la API de WooCommerce no responde, el bot deberá informar el problema sin mo
 
 Ejemplo:
 
-**Bot:** No pude consultar el catálogo en este momento. Intenta nuevamente dentro de unos minutos.
+**Bot:** No pude consultar el catálogo en este momento. ¿Quieres intentar nuevamente?
+
+El término de búsqueda se conservará para que el usuario no tenga que escribirlo otra vez.
+
+---
+
+## Error al consultar Ollama
+
+Si Ollama no responde, FerreBot informará que la consulta abierta no puede procesarse temporalmente.
+
+Ejemplo:
+
+**Bot:** No pude responder esa consulta en este momento. Puedes intentar nuevamente o usar `/ayuda`.
+
+---
+
+## Derivación a humano
+
+Cuando el usuario solicite hablar con una persona o cuando falle tres veces consecutivas en una entrada requerida, FerreBot ofrecerá la derivación.
+
+Ejemplo:
+
+**Bot:** No logramos completar esta consulta. Si lo prefieres, puedes solicitar atención de una persona.
+
+La derivación no implica que FerreBot invente un agente disponible. El bot únicamente indicará el medio de contacto definido para la tienda cuando ese dato esté configurado.
 
 ---
 
@@ -220,51 +319,74 @@ Ejemplo:
 ```mermaid
 flowchart TD
 
-    A[Usuario envía /start] --> B[Bot muestra bienvenida]
-    B --> C[Bot ofrece opción Buscar producto]
+    A[Usuario envía mensaje] --> B{¿Comando global?}
 
-    C --> D[Usuario selecciona Buscar producto]
-    D --> E[Bot pregunta qué producto busca]
+    B -- /start --> C[Mostrar bienvenida y opciones]
+    B -- /ayuda --> D[Mostrar ayuda]
+    B -- /cancelar --> E[Cancelar flujo actual y volver al inicio]
+    B -- No --> F{¿Qué intención detecta el bot?}
 
-    E --> F{¿Entrada válida?}
+    D --> G[Continuar desde el estado actual]
+    E --> C
 
-    F -- No --> G[Bot solicita un nombre de producto]
-    G --> E
+    F -- Buscar producto o precio --> H{¿El mensaje ya contiene el producto?}
+    H -- Sí --> I[Guardar nombre del producto]
+    H -- No --> J[Preguntar qué producto busca]
 
-    F -- Sí --> H[Consultar API de WooCommerce]
+    J --> K{¿Entrada válida?}
+    K -- Sí --> I
+    K -- No --> L[Incrementar contador de intentos]
+    L --> M{¿Intentos menores a 3?}
+    M -- Sí --> J
+    M -- No --> N[Ofrecer volver al inicio o atención humana]
 
-    H --> I{¿La API respondió?}
+    I --> O[Consultar API de WooCommerce]
+    O --> P{¿La API respondió?}
 
-    I -- No --> J[Bot informa que ocurrió un problema temporal]
-    J --> B
+    P -- No --> Q[Informar fallo temporal]
+    Q --> R{¿Desea reintentar?}
+    R -- Sí --> O
+    R -- No --> C
 
-    I -- Sí --> K{¿Se encontraron productos?}
+    P -- Sí --> S{¿Se encontraron productos?}
 
-    K -- No --> L[Bot informa que no encontró resultados]
-    L --> M{¿Desea intentar otra búsqueda?}
+    S -- No --> T[Informar que no se encontraron resultados]
+    T --> U{¿Desea buscar otro producto?}
+    U -- Sí --> J
+    U -- No --> C
 
-    M -- Sí --> E
-    M -- No --> B
+    S -- Sí --> V{¿Hay un solo resultado?}
 
-    K -- Sí --> N{¿Hay un solo resultado?}
+    V -- Sí --> W[Mostrar nombre y precio]
+    V -- No --> X[Mostrar lista numerada de productos]
+    X --> Y[Usuario selecciona una opción]
+    Y --> Z{¿Selección válida?}
 
-    N -- Sí --> O[Mostrar nombre y precio del producto]
+    Z -- Sí --> W
+    Z -- No --> AA[Incrementar contador de intentos]
+    AA --> AB{¿Intentos menores a 3?}
+    AB -- Sí --> X
+    AB -- No --> N
 
-    N -- No --> P[Mostrar lista de productos similares]
-    P --> Q[Usuario selecciona un producto]
-    Q --> O
+    W --> AC{¿Desea buscar otro producto?}
+    AC -- Sí --> J
+    AC -- No --> C
 
-    O --> R{¿Desea buscar otro producto?}
+    F -- Consulta abierta de ferretería --> AD[Enviar consulta a Ollama]
+    AD --> AE{¿Ollama respondió?}
+    AE -- Sí --> AF[Mostrar respuesta]
+    AE -- No --> AG[Informar fallo temporal]
+    AF --> C
+    AG --> C
 
-    R -- Sí --> E
-    R -- No --> B
+    F -- Hablar con una persona --> N
 
-    E --> S[Usuario escribe /cancelar]
-    S --> B
+    F -- Fuera de alcance --> AH[Explicar funciones disponibles]
+    AH --> C
 
-    E --> T[Usuario escribe /ayuda]
-    T --> U[Bot explica cómo buscar productos]
-    U --> E
+    N --> AI{¿Qué desea hacer?}
+    AI -- Volver al inicio --> C
+    AI -- Atención humana --> AJ[Mostrar medio de contacto configurado]
 ```
 
 ---
@@ -273,15 +395,11 @@ flowchart TD
 
 **Usuario:** `/start`
 
-**Bot:** ¡Hola! Soy FerreBot. Puedo ayudarte a buscar productos de la ferretería y consultar sus precios.
+**Bot:** ¡Hola! Soy FerreBot 🔧. Puedo ayudarte a buscar productos, consultar precios y responder preguntas básicas de ferretería.
 
-¿Qué deseas hacer?
+Puedes escribir el nombre de un producto, usar `/ayuda` o hacer una pregunta relacionada con herramientas.
 
-**Usuario:** Buscar producto.
-
-**Bot:** Claro. ¿Qué producto buscas?
-
-**Usuario:** Martillo.
+**Usuario:** Quiero buscar un martillo.
 
 **Bot:** Encontré este producto:
 
@@ -292,7 +410,9 @@ Precio: **$8.50**
 
 **Usuario:** No.
 
-**Bot:** Entendido. Si necesitas consultar otro producto, puedes escribir `/start`.
+**Bot:** Entendido. Si necesitas otra consulta, puedes escribir `/start`.
+
+Este ejemplo demuestra que, cuando el usuario ya proporciona el nombre del producto en su mensaje, FerreBot reutiliza ese dato y no vuelve a preguntarlo.
 
 ---
 
@@ -311,6 +431,8 @@ Se tendrán en cuenta las siguientes consideraciones:
 - Permitir regresar al inicio.
 - Proporcionar ayuda mediante `/ayuda`.
 - Permitir cancelar mediante `/cancelar`.
+- Mantener `/ayuda` y `/cancelar` disponibles durante cualquier flujo.
+- Mostrar listas numeradas cuando existan varias coincidencias.
 - No depender únicamente de imágenes o colores para comunicar información.
 - Mantener las respuestas comprensibles para usuarios con experiencia tecnológica básica.
 - Evitar solicitar al usuario que memorice muchos comandos.
@@ -330,16 +452,24 @@ Las tareas serán:
 3. Buscar un producto.
 4. Consultar su precio.
 5. Buscar un producto inexistente.
-6. Solicitar ayuda.
-7. Cancelar una búsqueda.
+6. Seleccionar un producto entre varios resultados.
+7. Probar una selección incorrecta.
+8. Solicitar ayuda.
+9. Cancelar una búsqueda.
+10. Hacer una consulta abierta relacionada con ferretería.
+11. Hacer una consulta fuera de alcance.
+12. Forzar tres entradas inválidas para comprobar la derivación.
 
 Durante las pruebas se observará:
 
 - Si el usuario comprende el mensaje inicial.
 - Si identifica fácilmente cómo buscar un producto.
+- Si el bot reutiliza los datos que el usuario ya proporcionó.
 - Si comprende las respuestas.
 - Si sabe cómo continuar después de cada respuesta.
+- Si `/ayuda` y `/cancelar` funcionan durante cualquier flujo.
 - Si existen partes de la conversación que produzcan confusión.
+- Si los mensajes de error orientan al usuario sin mostrar información técnica.
 
 Los problemas encontrados serán utilizados para modificar el diseño conversacional.
 
@@ -354,10 +484,13 @@ Se evaluarán los siguientes aspectos:
 - Claridad de las instrucciones.
 - Comprensión de los resultados.
 - Facilidad para seleccionar un producto cuando existen varias coincidencias.
+- Validación de opciones incorrectas.
 - Facilidad para volver al inicio.
 - Facilidad para cancelar una operación.
 - Facilidad para obtener ayuda.
 - Comprensión de los mensajes de error.
+- Comportamiento después de tres intentos inválidos.
+- Claridad de las respuestas generadas por Ollama.
 
 Una prueba será considerada exitosa si el usuario puede completar la búsqueda de un producto sin recibir instrucciones adicionales de otra persona.
 
@@ -369,11 +502,15 @@ Se comprobarán los siguientes aspectos técnicos:
 
 - Tiempo de respuesta del bot.
 - Tiempo de respuesta de la API de WooCommerce.
+- Tiempo de respuesta de Ollama.
 - Correcto funcionamiento de las búsquedas.
 - Comportamiento cuando un producto no existe.
 - Comportamiento cuando existen múltiples coincidencias.
 - Comportamiento cuando la API no responde.
+- Comportamiento cuando Ollama no responde.
 - Correcto funcionamiento con varias consultas consecutivas.
+- Funcionamiento de los reintentos.
+- Correcto funcionamiento de los comandos globales.
 
 El bot deberá responder en un tiempo razonable para que la conversación no se sienta interrumpida.
 
@@ -383,7 +520,7 @@ El bot deberá responder en un tiempo razonable para que la conversación no se 
 
 FerreBot utilizará la menor cantidad posible de información personal.
 
-Para buscar productos y consultar precios no será necesario solicitar:
+Para buscar productos, consultar precios o responder preguntas generales no será necesario solicitar:
 
 - Nombre completo.
 - Dirección.
@@ -392,7 +529,9 @@ Para buscar productos y consultar precios no será necesario solicitar:
 - Información bancaria.
 - Información de tarjetas.
 
-El bot únicamente necesitará procesar información necesaria para mantener la conversación y realizar la búsqueda.
+El bot únicamente necesitará procesar información necesaria para mantener la conversación y realizar la búsqueda o consulta.
+
+Las consultas abiertas enviadas a Ollama serán procesadas en infraestructura propia y no deberán incluir información personal que no sea necesaria.
 
 ---
 
@@ -403,12 +542,16 @@ Durante la interacción pueden procesarse los siguientes datos:
 - Identificador del chat de Telegram.
 - Texto enviado por el usuario.
 - Nombre o término del producto buscado.
+- Estado actual de la conversación.
+- Número de intentos inválidos.
 
 El identificador del chat se utilizará únicamente para poder enviar la respuesta al usuario.
 
 Los términos de búsqueda se utilizarán para consultar los productos disponibles en WooCommerce.
 
-En esta primera versión no se plantea almacenar permanentemente el historial de búsquedas de los usuarios.
+El estado de conversación y el contador de intentos se utilizarán únicamente para mantener el flujo correcto.
+
+En esta primera versión no se plantea almacenar permanentemente el historial completo de búsquedas o conversaciones.
 
 Si posteriormente fuera necesario almacenar datos, se deberá definir un periodo de conservación y eliminar aquellos que ya no sean necesarios.
 
@@ -425,8 +568,11 @@ Podrá:
 - Consultar precios.
 - Mostrar productos similares.
 - Informar cuando no existen resultados.
+- Responder preguntas básicas relacionadas con herramientas y ferretería mediante Ollama.
 - Mostrar ayuda.
 - Cancelar una búsqueda.
+- Volver al inicio.
+- Ofrecer derivación a atención humana cuando corresponda.
 
 En esta primera versión no realizará:
 
@@ -435,8 +581,12 @@ En esta primera versión no realizará:
 - Modificación de pedidos.
 - Registro de clientes.
 - Procesamiento de información bancaria.
-- Atención de consultas que no estén relacionadas con el catálogo de productos.
+- Confirmación de inventario si WooCommerce no proporciona ese dato.
+- Respuestas sobre temas completamente ajenos a la ferretería.
 
+Los precios, productos y disponibilidad nunca serán inventados por Ollama. Cuando una consulta dependa del catálogo, FerreBot deberá utilizar WooCommerce.
+
+---
 
 # 14. Evaluación de Diseño Conversacional (revisado por HV21011)
 
@@ -464,3 +614,16 @@ En esta primera versión no realizará:
 * *Veredicto:* Resuelto.
 * *Evidencia:* El bot contempla /cancelar y /ayuda desde el nodo de búsqueda, y cierra el ciclo adecuadamente preguntando "¿Deseas buscar otro producto?" para ofrecer continuidad.
 * *Mejora:* Se recomienda /cancelar y /ayuda como comandos globales disponibles desde cualquier estado de la conversación.
+
+---
+
+# 15. Cambios realizados después de la revisión entre pares
+
+- Se modificó el mensaje inicial para explicar de forma más clara qué puede hacer FerreBot y qué comandos están disponibles, a partir de la observación 1 de HV21011.
+- Se agregó reutilización del nombre del producto cuando el usuario lo incluye en su mensaje inicial, a partir de la observación 3 de HV21011.
+- Se agregó un máximo de tres intentos para entradas inválidas y derivación a atención humana, a partir de la observación 4 de HV21011.
+- Se hicieron `/ayuda` y `/cancelar` comandos globales disponibles durante cualquier estado de la conversación, a partir de la observación 5 de HV21011.
+- Se agregó validación cuando el usuario selecciona una opción de una lista de productos.
+- Se modificó el manejo del fallo de WooCommerce para conservar el término de búsqueda y permitir reintentar.
+- Se agregó la integración de Ollama para consultas abiertas relacionadas con ferretería, manteniendo WooCommerce como fuente de verdad para productos y precios.
+- Se agregó el manejo del caso en que Ollama no responda.
