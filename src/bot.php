@@ -31,6 +31,7 @@ function loadConfig(string $dir): array
         'token' => (string) $values['BOT_TOKEN'],
         'ollama_url' => rtrim((string) ($values['OLLAMA_URL'] ?? 'http://127.0.0.1:11434'), '/'),
         'ollama_model' => (string) ($values['OLLAMA_MODEL'] ?? 'qwen2.5:0.5b'),
+        'webhook_secret' => (string) ($values['WEBHOOK_SECRET'] ?? ''),
     ];
 }
 
@@ -50,6 +51,7 @@ function logLine(string $direction, string $chatId, string $text): void
         date('[Y-m-d H:i:s] ') . $direction . ' chat=' . $chatId . ' ' . $safeText . PHP_EOL,
         FILE_APPEND | LOCK_EX
     );
+    chmod(LOG_FILE, 0660);
 }
 
 function loadOffset(): int
@@ -94,6 +96,7 @@ function saveState(array $state): void
         json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
         LOCK_EX
     );
+    chmod(STATE_FILE, 0660);
 }
 
 function httpJson(string $url, ?array $payload = null, int $timeout = 30): array
@@ -733,31 +736,45 @@ function processMessage(string $token, array $config, array &$state, string $cha
     sendMessage($token, $chatId, $answer ?? 'No pude responder esa consulta. Escribe /ayuda o elige una opcion del menu.', mainMenu());
 }
 
-$config = loadConfig(__DIR__);
-$offset = loadOffset();
-$state = loadState();
-
-echo "CitasBot Sesion 2 iniciado con long polling.\n";
-
-while (true) {
-    $updates = getUpdates($config['token'], $offset);
-    if (!empty($updates['ok']) && isset($updates['result'])) {
-        foreach ($updates['result'] as $update) {
-            $offset = max($offset, (int) ($update['update_id'] ?? 0));
-            $message = $update['message'] ?? null;
-            if (!is_array($message) || !isset($message['chat']['id'])) {
-                saveOffset($offset);
-                continue;
-            }
-            $chatId = (string) $message['chat']['id'];
-            $text = (string) ($message['text'] ?? '');
-            if ($text !== '') {
-                processMessage($config['token'], $config, $state, $chatId, $text);
-                saveState($state);
-            }
-            saveOffset($offset);
-        }
-    } else {
-        usleep(500000);
+function processTelegramUpdate(array $update, array $config, array &$state): void
+{
+    $message = $update['message'] ?? null;
+    if (!is_array($message) || !isset($message['chat']['id'])) {
+        return;
     }
+
+    $chatId = (string) $message['chat']['id'];
+    $text = (string) ($message['text'] ?? '');
+    if ($text === '') {
+        return;
+    }
+
+    processMessage($config['token'], $config, $state, $chatId, $text);
+    saveState($state);
+}
+
+function runLongPolling(): void
+{
+    $config = loadConfig(__DIR__);
+    $offset = loadOffset();
+    $state = loadState();
+
+    echo "CitasBot Sesion 2 iniciado con long polling.\n";
+
+    while (true) {
+        $updates = getUpdates($config['token'], $offset);
+        if (!empty($updates['ok']) && isset($updates['result'])) {
+            foreach ($updates['result'] as $update) {
+                $offset = max($offset, (int) ($update['update_id'] ?? 0));
+                processTelegramUpdate($update, $config, $state);
+                saveOffset($offset);
+            }
+        } else {
+            usleep(500000);
+        }
+    }
+}
+
+if (PHP_SAPI === 'cli' && realpath((string) ($_SERVER['SCRIPT_FILENAME'] ?? '')) === __FILE__) {
+    runLongPolling();
 }

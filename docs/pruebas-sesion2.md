@@ -3,7 +3,7 @@
 ## Entorno
 
 - PHP 8.4 con la extension cURL.
-- Telegram Bot API mediante long polling durante el desarrollo.
+- Telegram Bot API mediante webhook HTTPS en el despliegue.
 - Open-Meteo para geocodificacion y temperatura actual.
 - Ollama local en `http://127.0.0.1:11434`.
 - Modelo configurado: `qwen2.5:0.5b`.
@@ -12,7 +12,7 @@
 
 | Prueba | Entrada | Resultado esperado | Estado |
 |---|---|---|---|
-| Inicio | `/start` | Bienvenida y menu de botones | Pendiente de evidencia Telegram |
+| Inicio | `/start` | Bienvenida y menu de botones | Verificado por webhook HTTPS |
 | Ayuda | `/ayuda` | Opciones y comandos disponibles | Pendiente de evidencia Telegram |
 | Agendamiento | `Agendar cita` y datos validos | Cita creada y numero asignado | Pendiente de evidencia Telegram |
 | Relleno de datos | `Quiero una limpieza el jueves 11` | No vuelve a pedir servicio ni fecha | Pendiente de evidencia Telegram |
@@ -28,13 +28,23 @@
 
 ```bash
 php -l src/bot.php
+php -l src/webhook.php
 systemctl is-active ollama
-systemctl is-active citasbot
+systemctl is-active nginx
+systemctl is-active php8.4-fpm
 curl http://127.0.0.1:11434/api/tags
 ```
 
 El token se mantiene en `.env`. El estado, el offset y los logs se mantienen en
 archivos locales excluidos por `.gitignore`.
 
-Durante desarrollo se usa long polling. El webhook HTTPS queda como etapa posterior
-cuando este disponible el dominio y certificado del Laboratorio 3.
+## Webhook HTTPS
+
+- URL: `https://as22027.duckdns.org/telegram-bot/bot.php`.
+- El dominio resuelve al servidor público `147.182.162.20`, que reenvía tráfico a
+  la VM mediante WireGuard.
+- El certificado HTTPS es válido.
+- El endpoint acepta solo POST y valida el encabezado secreto de Telegram.
+- `getWebhookInfo` confirmó la URL, `max_connections=1` y cero updates pendientes.
+- El servicio `citasbot` de long polling quedó deshabilitado e inactivo para evitar
+  conflictos con el webhook.
