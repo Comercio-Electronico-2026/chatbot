@@ -3,86 +3,80 @@
 
 $envFile = dirname(__DIR__) . '/.env';
 if (file_exists($envFile)) {
-    $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    foreach ($lines as $line) {
+    foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
         $line = trim($line);
-        if (empty($line) || strpos($line, '#') === 0) continue;
-        list($name, $value) = explode('=', $line, 2);
+
+        if ($line === '' || strpos($line, '#') === 0) {
+            continue;
+        }
+
+        [$name, $value] = explode('=', $line, 2);
         $_ENV[trim($name)] = trim($value);
     }
 }
 
 $botToken = getenv('BOT_TOKEN') ?: ($_ENV['BOT_TOKEN'] ?? '');
 
-if (empty($botToken)) {
+if (!$botToken) {
     die("❌ Error: No se encontró la variable BOT_TOKEN en el archivo .env\n");
 }
 
 $apiUrl = "https://api.telegram.org/bot{$botToken}/";
 
-// Probar conexión y obtener datos del bot (getMe)
-$ch = curl_init($apiUrl . "getMe");
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-$res = curl_exec($ch);
-curl_close($ch);
+// FUNCIONES DEL BOT
 
-$me = json_decode($res, true);
-if (!$me || !($me['ok'] ?? false)) {
-    die("❌ Error: Token inválido o problema al conectar con Telegram.\n");
-}
+function telegram(string $method, array $data = []): ?array
+{
+    global $apiUrl;
 
-echo "✅ Bot conectado exitosamente: @" . $me['result']['username'] . " (ID: " . $me['result']['id'] . ")\n";
-echo "📡 Escuchando mensajes con Long Polling (Presiona Ctrl + C para salir)...\n";
+    $ch = curl_init($apiUrl . $method);
 
-$offset = 0;
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => !empty($data),
+        CURLOPT_POSTFIELDS => !empty($data) ? http_build_query($data) : null,
+        CURLOPT_TIMEOUT => 40
+    ]);
 
-while (true) {
-    // getUpdates con long polling (espera hasta 30s si no hay mensajes nuevos)
-    $ch = curl_init($apiUrl . "getUpdates?timeout=30&offset=" . $offset);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 40);
     $response = curl_exec($ch);
     curl_close($ch);
 
-    if ($response === false) {
-        sleep(2);
-        continue;
-    }
+    return $response ? json_decode($response, true) : null;
+}
 
-    $data = json_decode($response, true);
+function enviarMensaje(int $chatId, string $texto): void
+{
+    telegram('sendMessage', [
+        'chat_id' => $chatId,
+        'text' => $texto
+    ]);
+}
 
-    if (!empty($data['result'])) {
-        foreach ($data['result'] as $update) {
-            $offset = $update['update_id'] + 1;
+function logAccion(string $nivel, string $mensaje): void
+{
+    $iconos = [
+        'INFO' => '📩',
+        'WARN' => '⚠️',
+        'ERROR' => '❌',
+        'SUCCESS' => '✅'
+    ];
 
-            if (isset($update['message']['text'])) {
-                $chatId = $update['message']['chat']['id'];
-                $text = trim($update['message']['text']);
-                $name = $update['message']['chat']['first_name'] ?? 'Usuario';
+    $icono = $iconos[$nivel] ?? 'ℹ️';
 
-                if (strpos($text, '/start') === 0) {
-                    $reply = "¡Hola {$name}! 👋\n\n"
-                           . "Bienvenido al asistente virtual de la tienda TechShift.\n\n"
-                           . "Opciones disponibles:\n"
-                           . "📦 /pedido - Rastrear estado de pedido\n"
-                           . "🛍️ /catalogo - Ver catálogo de productos\n"
-                           . "❓ /help - Ayuda\n\n"
-                           . "¿En qué te puedo ayudar hoy?";
+    echo "{$icono} [{$nivel}] {$mensaje}" . PHP_EOL;
+}
 
-                    // Enviar respuesta por sendMessage
-                    $sendCh = curl_init($apiUrl . "sendMessage");
-                    curl_setopt($sendCh, CURLOPT_POST, true);
-                    curl_setopt($sendCh, CURLOPT_POSTFIELDS, http_build_query([
-                        'chat_id' => $chatId,
-                        'text' => $reply
-                    ]));
-                    curl_setopt($sendCh, CURLOPT_RETURNTRANSFER, true);
-                    curl_exec($sendCh);
-                    curl_close($sendCh);
+function mostrarMenu(int $chatId, string $nombre): void
+{
+    $mensaje = "¡Hola {$nombre}! 👋\n\n"
+             . "Bienvenido al asistente virtual de TechShift.\n\n"
+             . "Opciones disponibles:\n"
+             . "📦 /pedido - Consultar pedido\n"
+             . "🛍️ /catalogo - Ver catálogo\n"
+             . "❓ /help - Ayuda\n"
+             . "👤 /soporte - Hablar con soporte\n"
+             . "❌ /cancel - Cancelar\n\n"
+             . "¿En qué te puedo ayudar?";
 
-                    echo "📩 [INFO] Respondido comando /start al usuario '{$name}' (Chat ID: {$chatId})\n";
-                }
-            }
-        }
-    }
+    enviarMensaje($chatId, $mensaje);
 }
