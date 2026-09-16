@@ -28,6 +28,66 @@ $storeApiUrl =
 $wooApiUrl =
     "https://tienda.hv21011.duckdns.org/wp-json/wc/v3";
 
+$logDirectory =
+    dirname(__DIR__) . '/storage/logs';
+
+if (!is_dir($logDirectory)) {
+    mkdir(
+        $logDirectory,
+        0775,
+        true
+    );
+}
+
+$logFile =
+    $logDirectory . '/bot.log';
+
+// ----------------------------------------------------
+// Logs
+// ----------------------------------------------------
+
+function botLog(
+    string $direction,
+    string|int $chatId,
+    string $text
+): void {
+    global $logFile;
+
+    // No se guarda  directamente el ID de Telegram.
+    // Usar una referencia para poder seguir
+    // la conversación sin exponerlo en el archivo.
+    $chatReference = substr(
+        hash(
+            'sha256',
+            (string) $chatId
+        ),
+        0,
+        12
+    );
+
+    // Se evita  que un solo mensaje rompa
+    // varias líneas del archivo de log.
+    $safeText = str_replace(
+        ["\r", "\n"],
+        ['', ' \\n '],
+        trim($text)
+    );
+
+    $line = sprintf(
+        "[%s] %s chat=%s | %s%s",
+        date('Y-m-d H:i:s'),
+        strtoupper($direction),
+        $chatReference,
+        $safeText,
+        PHP_EOL
+    );
+
+    file_put_contents(
+        $logFile,
+        $line,
+        FILE_APPEND | LOCK_EX
+    );
+}
 
 // ----------------------------------------------------
 // Funciones de Telegram
@@ -109,6 +169,20 @@ function sendMessage(
         'sendMessage',
         $params
     );
+
+    if ($response !== null) {
+        botLog(
+            'OUT',
+            $chatId,
+            $text
+        );
+    } else {
+        botLog(
+            'ERROR',
+            $chatId,
+            'No fue posible enviar la respuesta a Telegram.'
+        );
+    }
 
     return $response !== null;
 }
@@ -913,6 +987,12 @@ while (true) {
         echo
             "Recibido de {$logUser}: " .
             "{$message}\n";
+
+        botLog(
+            'IN',
+            $chatId,
+            $message
+        );
 
 
         // ------------------------------------------------
