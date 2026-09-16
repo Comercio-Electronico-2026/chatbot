@@ -19,8 +19,17 @@ if (!$env || empty($env['BOT_TOKEN'])) {
 $token = $env['BOT_TOKEN'];
 $apiUrl = "https://api.telegram.org/bot" . $token;
 
+$wcConsumerKey =
+    $env['WC_CONSUMER_KEY'] ?? '';
+
+$wcConsumerSecret =
+    $env['WC_CONSUMER_SECRET'] ?? '';
+
 $storeApiUrl =
     "https://tienda.hv21011.duckdns.org/wp-json/wc/store/v1/products";
+
+$wooApiUrl =
+    "https://tienda.hv21011.duckdns.org/wp-json/wc/v3";
 
 
 // ----------------------------------------------------
@@ -53,19 +62,28 @@ function telegramRequest(string $method, array $params = []): ?array
         return null;
     }
 
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $httpCode = curl_getinfo(
+        $ch,
+        CURLINFO_HTTP_CODE
+    );
 
     curl_close($ch);
 
     if ($httpCode < 200 || $httpCode >= 300) {
-        error_log("Telegram respondió con HTTP {$httpCode}");
+        error_log(
+            "Telegram respondió con HTTP {$httpCode}"
+        );
+
         return null;
     }
 
     $data = json_decode($response, true);
 
     if (!is_array($data) || !($data['ok'] ?? false)) {
-        error_log('Respuesta no válida de Telegram');
+        error_log(
+            'Respuesta no válida de Telegram'
+        );
+
         return null;
     }
 
@@ -112,7 +130,8 @@ function getHelpText(): string
         "👤 /soporte - Consultar atención humana\n" .
         "🚪 /salir - Terminar la interacción\n\n" .
         "También puedes buscar directamente, por ejemplo:\n" .
-        "/catalogo Madonna";
+        "/catalogo Chloe\n" .
+        "/pedido 17";
 }
 
 
@@ -273,12 +292,10 @@ function productMatchesSearch(
         $product['name'] ?? ''
     );
 
-    // Buscar por nombre de álbum/producto
     if (stripos($productName, $term) !== false) {
         return true;
     }
 
-    // Buscar por el atributo Artista
     $artists = getProductAttributeValues(
         $product,
         'Artista'
@@ -295,7 +312,7 @@ function productMatchesSearch(
 
 
 // ----------------------------------------------------
-// WooCommerce REST API
+// WooCommerce Store API - Catálogo
 // ----------------------------------------------------
 
 function fetchCatalogProducts(): array
@@ -388,7 +405,6 @@ function searchProducts(string $term): array
     $results = [];
 
     foreach ($catalog['products'] as $product) {
-
         if (productMatchesSearch($product, $term)) {
             $results[] = $product;
         }
@@ -447,7 +463,6 @@ function formatProductPrice(array $product): string
 
 function formatCatalogResults(array $products): string
 {
-    // Evitamos enviar mensajes demasiado largos.
     $products = array_slice($products, 0, 5);
 
     $reply = "🎵 Encontré estos productos:\n";
@@ -553,6 +568,187 @@ function performCatalogSearch(string $term): array
 
 
 // ----------------------------------------------------
+// WooCommerce REST API - Pedidos
+// ----------------------------------------------------
+
+function getOrderStatusText(string $status): string
+{
+    $statuses = [
+        'pending'        => 'Pendiente de pago',
+        'processing'     => 'Procesando',
+        'on-hold'        => 'En espera',
+        'completed'      => 'Completado',
+        'cancelled'      => 'Cancelado',
+        'refunded'       => 'Reembolsado',
+        'failed'         => 'Fallido',
+        'checkout-draft' => 'Borrador',
+    ];
+
+    return $statuses[$status]
+        ?? ucfirst(str_replace('-', ' ', $status));
+}
+
+
+function fetchOrder(int $orderId): array
+{
+    global $wooApiUrl;
+    global $wcConsumerKey;
+    global $wcConsumerSecret;
+
+    if (
+        $wcConsumerKey === '' ||
+        $wcConsumerSecret === ''
+    ) {
+        error_log(
+            'Las credenciales de WooCommerce no están configuradas'
+        );
+
+        return [
+            'status' => 'error',
+        ];
+    }
+
+    $url =
+        $wooApiUrl .
+        '/orders/' .
+        $orderId .
+        '?_fields=id,status,date_created';
+
+    $ch = curl_init($url);
+
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_USERPWD =>
+            $wcConsumerKey . ':' . $wcConsumerSecret,
+        CURLOPT_HTTPAUTH => CURLAUTH_BASIC,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_TIMEOUT => 20,
+        CURLOPT_HTTPHEADER => [
+            'Accept: application/json',
+        ],
+    ]);
+
+    $response = curl_exec($ch);
+
+    if ($response === false) {
+        error_log(
+            'Error al consultar pedido: ' .
+            curl_error($ch)
+        );
+
+        curl_close($ch);
+
+        return [
+            'status' => 'error',
+        ];
+    }
+
+    $httpCode =
+        curl_getinfo(
+            $ch,
+            CURLINFO_HTTP_CODE
+        );
+
+    curl_close($ch);
+
+    if ($httpCode === 404) {
+        return [
+            'status' => 'not_found',
+        ];
+    }
+
+    if ($httpCode < 200 || $httpCode >= 300) {
+        error_log(
+            "WooCommerce Orders respondió HTTP {$httpCode}"
+        );
+
+        return [
+            'status' => 'error',
+        ];
+    }
+
+    $order = json_decode(
+        $response,
+        true
+    );
+
+    if (
+        !is_array($order) ||
+        empty($order['id'])
+    ) {
+        return [
+            'status' => 'error',
+        ];
+    }
+
+    return [
+        'status' => 'success',
+        'order' => $order,
+    ];
+}
+
+
+function performOrderSearch(string $value): array
+{
+    $value = trim($value);
+
+    if (
+        $value === '' ||
+        !ctype_digit($value) ||
+        (int) $value <= 0
+    ) {
+        return [
+            'status' => 'invalid',
+            'text' =>
+                "El número de pedido debe contener " .
+                "solamente números.\n\n" .
+                "Por ejemplo: 17",
+        ];
+    }
+
+    $orderId = (int) $value;
+
+    $result = fetchOrder($orderId);
+
+    if ($result['status'] === 'not_found') {
+        return [
+            'status' => 'not_found',
+            'text' =>
+                "No encontré un pedido con el número " .
+                "#{$orderId}.\n\n" .
+                "Revisa el número e inténtalo nuevamente.",
+        ];
+    }
+
+    if ($result['status'] === 'error') {
+        return [
+            'status' => 'error',
+            'text' =>
+                "En este momento no puedo consultar " .
+                "el estado del pedido.\n\n" .
+                "Puedes intentarlo nuevamente más tarde " .
+                "o escribir /menu.",
+        ];
+    }
+
+    $order = $result['order'];
+
+    $status = getOrderStatusText(
+        $order['status'] ?? 'desconocido'
+    );
+
+    return [
+        'status' => 'success',
+        'text' =>
+            "📦 Pedido #{$orderId}\n\n" .
+            "Estado: {$status}\n\n" .
+            "Puedes consultar otro pedido con /pedido " .
+            "o volver al menú con /menu.",
+    ];
+}
+
+
+// ----------------------------------------------------
 // Inicio mediante long polling
 // ----------------------------------------------------
 
@@ -591,7 +787,6 @@ while (true) {
             continue;
         }
 
-        // Datos básicos del usuario
         $from =
             $update['message']['from'] ?? [];
 
@@ -644,9 +839,6 @@ while (true) {
                 getMenuText($firstName)
             );
 
-            echo
-                "Enviado menú principal a {$logUser}\n";
-
             continue;
         }
 
@@ -660,9 +852,6 @@ while (true) {
                 getMenuText($firstName)
             );
 
-            echo
-                "Enviado menú principal a {$logUser}\n";
-
             continue;
         }
 
@@ -673,9 +862,6 @@ while (true) {
                 $chatId,
                 getHelpText()
             );
-
-            echo
-                "Enviada ayuda a {$logUser}\n";
 
             continue;
         }
@@ -690,9 +876,6 @@ while (true) {
                 getSupportText()
             );
 
-            echo
-                "Enviada información de soporte a {$logUser}\n";
-
             continue;
         }
 
@@ -701,41 +884,26 @@ while (true) {
 
             clearSession($chatId);
 
-            $reply =
-                "¡Hasta luego, {$firstName}! 🎵\n\n" .
-                "Gracias por usar MusicHub Bot.\n" .
-                "Puedes escribir /start cuando quieras volver.";
-
             sendMessage(
                 $chatId,
-                $reply
+                "¡Hasta luego, {$firstName}! 🎵\n\n" .
+                "Gracias por usar MusicHub Bot.\n" .
+                "Puedes escribir /start cuando quieras volver."
             );
-
-            echo
-                "Finalizada interacción con {$logUser}\n";
 
             continue;
         }
 
 
         // ------------------------------------------------
-        // /catalogo
+        // Catálogo
         // ------------------------------------------------
 
         if ($command === '/catalogo') {
 
             clearSession($chatId);
 
-            // Ejemplo:
-            // /catalogo Chloe
-            //
-            // Como el dato ya viene incluido,
-            // no volvemos a solicitarlo.
-
             if ($argument !== '') {
-
-                echo
-                    "Buscando en catálogo: {$argument}\n";
 
                 $result =
                     performCatalogSearch($argument);
@@ -773,49 +941,74 @@ while (true) {
                 "Por ejemplo: Chloe"
             );
 
-            echo
-                "Esperando búsqueda de catálogo de {$logUser}\n";
-
             continue;
         }
 
 
         // ------------------------------------------------
-        // /pedido - lo implementaremos después
+        // Pedido
         // ------------------------------------------------
 
         if ($command === '/pedido') {
 
             clearSession($chatId);
 
-            sendMessage(
+            if ($argument !== '') {
+
+                $result =
+                    performOrderSearch($argument);
+
+                sendMessage(
+                    $chatId,
+                    $result['text']
+                );
+
+                if (
+                    $result['status'] === 'invalid' ||
+                    $result['status'] === 'not_found'
+                ) {
+                    saveSession(
+                        $chatId,
+                        [
+                            'state' => 'awaiting_order',
+                            'attempts' => 1,
+                        ]
+                    );
+                }
+
+                continue;
+            }
+
+            saveSession(
                 $chatId,
-                "La consulta de pedidos será " .
-                "implementada en el siguiente bloque."
+                [
+                    'state' => 'awaiting_order',
+                    'attempts' => 0,
+                ]
             );
 
-            echo
-                "Solicitado pedido por {$logUser}\n";
+            sendMessage(
+                $chatId,
+                "¿Cuál es el número de tu pedido?\n\n" .
+                "Por ejemplo: 17"
+            );
 
             continue;
         }
 
 
         // ------------------------------------------------
-        // Estado actual de conversación
+        // Estado actual
         // ------------------------------------------------
 
         $session = loadSession($chatId);
 
 
         // ------------------------------------------------
-        // Esperando búsqueda de catálogo
+        // Esperando catálogo
         // ------------------------------------------------
 
         if ($session['state'] === 'awaiting_catalog') {
-
-            // Un mensaje vacío o un comando desconocido
-            // no debe usarse como término de búsqueda.
 
             if (
                 $message === '' ||
@@ -836,10 +1029,6 @@ while (true) {
                         "al menú o /soporte para recibir ayuda."
                     );
 
-                    echo
-                        "Máximo de intentos en catálogo " .
-                        "para {$logUser}\n";
-
                     continue;
                 }
 
@@ -858,15 +1047,9 @@ while (true) {
                 continue;
             }
 
-
-            echo
-                "Buscando en catálogo: {$message}\n";
-
             $result =
                 performCatalogSearch($message);
 
-
-            // Producto encontrado
             if ($result['status'] === 'success') {
 
                 clearSession($chatId);
@@ -876,15 +1059,9 @@ while (true) {
                     $result['text']
                 );
 
-                echo
-                    "Consulta de catálogo completada " .
-                    "para {$logUser}\n";
-
                 continue;
             }
 
-
-            // Fallo del servicio REST
             if ($result['status'] === 'error') {
 
                 sendMessage(
@@ -892,15 +1069,9 @@ while (true) {
                     $result['text']
                 );
 
-                echo
-                    "Fallo de API durante consulta " .
-                    "de {$logUser}\n";
-
                 continue;
             }
 
-
-            // No hubo resultados
             $session['attempts']++;
 
             if ($session['attempts'] >= 3) {
@@ -914,10 +1085,6 @@ while (true) {
                     "sin resultados.\n\n" .
                     "Puedes escribir /menu o /soporte."
                 );
-
-                echo
-                    "Máximo de búsquedas sin resultados " .
-                    "para {$logUser}\n";
 
                 continue;
             }
@@ -934,8 +1101,69 @@ while (true) {
                 "para volver a intentar."
             );
 
-            echo
-                "Búsqueda sin resultados de {$logUser}\n";
+            continue;
+        }
+
+
+        // ------------------------------------------------
+        // Esperando pedido
+        // ------------------------------------------------
+
+        if ($session['state'] === 'awaiting_order') {
+
+            $result =
+                performOrderSearch($message);
+
+            if ($result['status'] === 'success') {
+
+                clearSession($chatId);
+
+                sendMessage(
+                    $chatId,
+                    $result['text']
+                );
+
+                continue;
+            }
+
+            if ($result['status'] === 'error') {
+
+                sendMessage(
+                    $chatId,
+                    $result['text']
+                );
+
+                continue;
+            }
+
+            $session['attempts']++;
+
+            if ($session['attempts'] >= 3) {
+
+                clearSession($chatId);
+
+                sendMessage(
+                    $chatId,
+                    $result['text'] .
+                    "\n\nYa realizaste varios intentos " .
+                    "sin éxito.\n\n" .
+                    "Puedes escribir /menu para volver " .
+                    "al menú o /soporte para recibir ayuda."
+                );
+
+                continue;
+            }
+
+            saveSession(
+                $chatId,
+                $session
+            );
+
+            sendMessage(
+                $chatId,
+                $result['text'] .
+                "\n\nEscribe otro número para intentarlo de nuevo."
+            );
 
             continue;
         }
@@ -958,10 +1186,6 @@ while (true) {
                 "o /soporte si necesitas ayuda."
             );
 
-            echo
-                "Máximo de entradas no reconocidas " .
-                "de {$logUser}\n";
-
             continue;
         }
 
@@ -975,9 +1199,6 @@ while (true) {
             "No pude reconocer esa opción.\n\n" .
             "Escribe /ayuda para ver lo que puedo hacer."
         );
-
-        echo
-            "Entrada no reconocida de {$logUser}\n";
     }
 
     sleep(1);
