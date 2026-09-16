@@ -5,7 +5,7 @@ if (!file_exists($envFile)) {
 }
 $env = parse_ini_file($envFile);
 $botToken = $env['BOT_TOKEN'] ?? null;
-
+$groqApiKey = $env['GROQ_API_KEY'] ?? null;
 if (!$botToken) {
     die("Error: BOT_TOKEN no definido en .env\n");
 }
@@ -219,8 +219,13 @@ while (true) {
             continue;
         }
 
-        // 4. FALLBACK GENERAL DE REGLAS
-        enviarMensaje($apiUrl, $chatId, "🤖 No entendí esa opción. Escribe /catalogo para ver productos o /ayuda.");
+	// 4. FALLBACK HÍBRIDO CON LLM
+		if ($groqApiKey) {
+		    $respuestaLlm = consultarLlm($groqApiKey, $text, $sender);
+		    enviarMensaje($apiUrl, $chatId, $respuestaLlm);
+		} else {
+		    enviarMensaje($apiUrl, $chatId, "🤖 No logré entender esa opción. Escribe /catalogo para ver productos o /ayuda.");
+		}
     }
 }
 
@@ -266,4 +271,39 @@ function evaluarErrorId($apiUrl, $chatId, &$userState, $soporteEmail) {
         enviarMensaje($apiUrl, $chatId, "No pudimos validar el ID seleccionado tras múltiples intentos. 😿\n\nPonte en contacto con nuestro equipo: {$soporteEmail}\n\nEscribe /start para reiniciar.");
         $userState[$chatId]['step'] = 'IDLE';
     }
+}
+function consultarLlm($apiKey, $userPrompt, $userName) {
+    $url = "https://api.groq.com/openai/v1/chat/completions";
+
+    $systemPrompt = "Eres Michu, el asistente virtual de la 'Tienda Michuno Gatuno'. Respondes siempre en español de forma amable, breve y carismática con temática gatuna (🐾, 🐱). Ayudas con dudas generales de gatos y recuerdas al usuario ({$userName}) que puede escribir /catalogo para ver productos o /envios para ver zonas de entrega. No inventes productos no existentes.";
+
+    $payload = [
+        "model" => "openai/gpt-oss-20b",
+        "messages" => [
+            ["role" => "system", "content" => $systemPrompt],
+            ["role" => "user", "content" => $userPrompt]
+        ],
+        "temperature" => 0.6,
+        "max_tokens" => 200
+    ];
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "Content-Type: application/json",
+        "Authorization: Bearer {$apiKey}"
+    ]);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+    curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+
+    $response = curl_exec($ch);
+    curl_close($ch);
+
+    $json = json_decode($response, true);
+    if (isset($json['choices'][0]['message']['content'])) {
+        return trim($json['choices'][0]['message']['content']);
+    }
+
+    return "¡Miau! No logré procesar tu mensaje en este momento. Escribe /catalogo para ver productos o /ayuda.";
 }
