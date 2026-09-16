@@ -291,3 +291,7 @@ while (true) {
         }
     }
 }
+
+
+//Quedo pendiente por completar, la api a pedidos, catalogo y demas funciones, tambien falta por completar la funcionalidad
+//de maximo 3 intentos fallidos y pulir las respuestas de la ia de groq para limitarlo y no gastar tokens innecesariamente
