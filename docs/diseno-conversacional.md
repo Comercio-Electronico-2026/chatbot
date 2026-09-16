@@ -3,34 +3,109 @@
 ## 1. Lista de Chequeo de Diseño Conversacional
 
 * **¿Quién usará el chatbot?**
-  Clientes recurrentes y potenciales de la tienda en línea que acceden desde Telegram para resolver dudas rápidas sin esperar soporte telefónico o por correo.
+  Clientes recurrentes y potenciales de la tienda en línea TechShift que acceden desde Telegram para resolver consultas frecuentes de forma rápida, sin depender de atención telefónica o por correo electrónico.
+
 * **¿Qué problema o problemas resuelve?**
-  Resuelve la saturación de soporte en horarios no laborales y la lentitud en la atención de consultas frecuentes (consultar si un producto está disponible y conocer el estado de entrega de una compra).
+  El chatbot busca reducir la saturación del soporte en horarios no laborales y agilizar la atención de consultas frecuentes relacionadas con:
+
+  - Estado y entrega estimada de pedidos.
+  - Consulta del catálogo y disponibilidad de productos.
+  - Orientación básica sobre las funciones disponibles del bot.
+  - Solicitud de soporte cuando la consulta está fuera del alcance del bot.
+
 * **¿Qué necesidades específicas tienen?**
-  Obtener confirmación rápida del stock de un producto y saber el estado y fecha estimada de entrega de su paquete ingresando únicamente el identificador de pedido.
+  Los usuarios necesitan:
+
+  - Consultar rápidamente el estado de un pedido.
+  - Conocer la fecha estimada de entrega de un pedido.
+  - Consultar productos disponibles en el catálogo.
+  - Recibir instrucciones claras sobre qué puede hacer el bot.
+  - Cancelar una operación en cualquier momento.
+  - Solicitar soporte humano cuando el bot no pueda resolver su consulta.
+
 * **¿Qué preguntas se pueden hacer?**
+  Ejemplos de consultas:
+
   - "¿Tienen disponible el producto X?"
   - "¿Cuál es el estado de mi pedido #1234?"
-  - "¿Qué comandos tienes disponibles?"
+  - "¿Dónde está mi pedido 1042?"
+  - "Quiero consultar mi pedido."
+  - "Quiero ver el catálogo."
+  - "¿Qué productos tienen?"
+  - "¿Qué puedes hacer?"
+  - "Necesito hablar con soporte."
+  - "Cancelar."
+
 * **¿Qué tipo de respuesta espero en cada caso?**
-  - Disponibilidad: Texto estructurado con nombre de producto, precio y estado de stock (o selección mediante lista/botones).
-  - Estado de pedido: Entrada numérica de 4 o más dígitos del pedido; respuesta con texto descriptivo del estado y fecha estimada.
-  - Menú/Start: Mensaje de bienvenida con lista de comandos.
+  - Inicio: mensaje de bienvenida y menú principal.
+  - Estado de pedido: solicitar el número de pedido únicamente si el usuario todavía no lo proporcionó. El identificador debe contener exactamente 4 dígitos.
+  - Pedido proporcionado dentro del mensaje: reutilizar el número detectado y consultar directamente la API, sin volver a solicitarlo.
+  - Catálogo: consultar la API de catálogo y mostrar la información disponible en un formato breve y comprensible.
+  - Ayuda: explicar las acciones disponibles y mostrar los comandos principales.
+  - Cancelación: cancelar el flujo actual, limpiar el estado de la conversación y regresar al menú.
+  - Soporte: informar que la consulta puede requerir atención humana y ofrecer la opción correspondiente disponible en la implementación.
+  - Entrada no reconocida: explicar brevemente las opciones disponibles y permitir hasta 3 intentos antes de regresar al menú.
+  - Fallo de API: informar que el servicio no está disponible temporalmente, sin mostrar errores técnicos, y ofrecer reintentar o regresar al menú.
+
 * **¿Cuál es su edad, ocupación, intereses, nivel de experiencia con tecnología?**
-  Público de 18 a 55 años, familiarizado con mensajería instantánea (Telegram/WhatsApp) y compras por internet, que prefiere resolver trámites en 2 pasos en lugar de navegar una web completa.
+  Público general adulto, aproximadamente entre 18 y 55 años, familiarizado con aplicaciones de mensajería y compras por internet.
+
 * **¿Cuáles son los escenarios alternativos (errores, datos faltantes, el usuario cambia de tema)?**
-  - Si el usuario introduce un número de pedido no numérico o con longitud inválida, el bot solicita corregirlo con un ejemplo claro.
-  - Si el pedido no existe en la base de datos/API, se notifica y se da opción de reintentar o hablar con soporte.
-  - Si escribe una palabra no reconocida o cambia de tema, el bot ofrece el menú principal o comando `/help`.
-  - El usuario puede cancelar en cualquier momento con `/cancel`.
+  - Número de pedido con formato inválido: se informa que debe contener exactamente 4 dígitos y se permite corregirlo.
+  - Tres intentos inválidos: después del tercer intento se ofrecen las opciones de volver al menú o solicitar soporte.
+  - Pedido inexistente: se informa que no fue encontrado y se permite reintentar o volver al menú.
+  - Tres consultas de pedido no encontradas: se ofrecen las opciones de volver al menú o solicitar soporte.
+  - API no disponible: se muestra un mensaje comprensible y se permite reintentar o regresar al menú.
+  - Entrada no reconocida: se solicita una opción válida y se permiten hasta 3 intentos.
+  - Tres entradas no reconocidas: se muestra ayuda y se regresa al menú.
+  - Cancelación durante cualquier flujo: /cancel cancela la operación actual y devuelve al menú.
+  - Solicitud de ayuda durante cualquier flujo: /help muestra las opciones disponibles sin tratar la palabra "ayuda" como un dato inválido.
+  - Cambio de tema durante un flujo: si el usuario solicita otra intención válida, el bot reconoce la nueva intención y abandona el flujo anterior para atenderla.
+  - Solicitud de soporte: se ofrece la ruta de soporte disponible.
+  - Usuario que ya proporciona el dato solicitado: el bot reutiliza el dato en lugar de pedirlo nuevamente.
+
 * **¿UI y Accesibilidad?**
-  Uso de textos breves, emojis informativos para facilitar lectura rápida, comandos claros con barra inclinada (`/start`, `/pedido`, `/catalogo`, `/ayuda`, `/cancel`).
+  El bot utilizará:
+
+  - Mensajes breves y directos.
+  - Emojis únicamente como apoyo visual.
+  - Botones o teclado de Telegram para las opciones principales.
+  - Comandos consistentes:
+    	- /start
+	- /pedido
+	- /catalogo
+	- /help
+	- /soporte
+	- /cancel
+  - Ejemplos concretos cuando se solicite un dato.
+  - Mensajes de error comprensibles, sin mostrar información técnica de APIs, servidores o excepciones.
+
 * **¿Cómo haré para validar mi prototipo?**
-  Mediante pruebas de usabilidad con la técnica del Mago de Oz (simulación de turnos con pares) y validación de cobertura de casos con las heurísticas conversacionales de Grice.
+  La validación se realizará mediante:
+
+  - Pruebas del camino feliz.
+  - Pruebas de escenarios alternativos.
+  - Técnica del Mago de Oz para simular la interacción y observar si las respuestas permiten completar las tareas.
+  - Revisión de las respuestas utilizando las heurísticas conversacionales de Grice.
+  - Pruebas de entradas inválidas, cambios de tema, cancelación, ayuda y fallos de servicio.
+
+  También se comprobará que el flujo no tenga bucles infinitos ni nodos sin salida.
+
 * **¿Privacidad y recolección de datos?**
-  - **Qué datos se recogen:** ID de usuario de Telegram, nombre público de Telegram y el número de pedido consultado.
-  - **Para qué:** Únicamente para asociar la consulta durante la sesión activa y enviar la respuesta.
-  - **Cuándo se eliminan:** No se almacenan datos financieros ni personales sensibles; las variables de estado en memoria expiran al cerrar la conversación o tras 30 minutos de inactividad.
+  Datos utilizados durante la interacción:
+
+  - ID de usuario de Telegram.
+  - Nombre público de Telegram, cuando esté disponible.
+  - Número de pedido proporcionado por el usuario.
+
+  Finalidad:
+  Los datos se utilizan únicamente para identificar la conversación, mantener el estado temporal del flujo y realizar la consulta solicitada.
+
+  Minimización:
+  El bot no solicita datos financieros ni información personal sensible para las funciones definidas en este diseño.
+
+  Estado de conversación:
+  El estado temporal de la conversación se mantiene mientras sea necesario para completar el flujo y debe expirar después de un período de inactividad definido por la implementación.
 
 ---
 
@@ -39,56 +114,172 @@
 | Intención | Ejemplo de enunciado | Frecuencia | Prioridad | Dato / API |
 | :--- | :--- | :--- | :--- | :--- |
 | **Iniciar interacción** | `/start`, `hola`, `buenas` | Alta | 1 | Ninguno |
-| **Estado de un pedido** | `¿dónde está mi pedido 1234?`, `/pedido` | Alta | 1 | API de pedidos (código: numérico) |
-| **Consultar catálogo** | `¿tienen teclados?`, `/catalogo` | Alta | 1 | API de catálogo (búsqueda: texto) |
+| **Estado de un pedido** | `¿dónde está mi pedido 1234?`, `/pedido` | Alta | 1 | Numero de pedido de exactamente 4 digitos / API de pedidos |
+| **Consultar catálogo** | `¿tienen teclados?`, `/catalogo`, `quiero ver productos`, | Alta | 1 | Texto de busqueda / API de catalogos |
 | **Pedir ayuda** | `/help`, `ayuda`, `¿qué puedes hacer?` | Media | 2 | Ninguno |
 | **Cancelar operación** | `/cancel`, `cancelar`, `salir` | Media | 2 | Limpieza de estado local |
+| **Solicitar soporte** | `/soporte`, `quiero hablar con alguien de soporte`, `necesito ayuda de un agente` | Media | 2 | Canal de soporte disponible |
+| **Entrada no reconocida** | `asdf`, `xyz`, `mensaje fuera del alcance` | Media | 3 | Contador de intentos |
+
+  Las intenciones /start, /help, /cancel y /soporte deben poder reconocerse independientemente del estado actual de la conversación.
+  Por ejemplo, si el bot está esperando un número de pedido y el usuario escribe /cancel, el bot debe cancelar el flujo en lugar de intentar validar /cancel como número.
 
 ---
 
-## 3. Diálogo de Muestra (Camino Feliz)
+## 3. Datos y Slot Filling
 
-**Usuario:** `/start`  
-**Bot:** ¡Hola! Soy el asistente virtual de la tienda. Puedo ayudarte a consultar el catálogo de productos o rastrear el estado de tu pedido. ¿Qué deseas hacer hoy?  
-**Usuario:** Quiero ver el estado de mi pedido  
-**Bot:** Con gusto. Por favor, indícame tu número de pedido (son 4 dígitos, por ejemplo: 1042).  
-**Usuario:** 1042  
-**Bot:** Tu pedido #1042 se encuentra **En tránsito** y su entrega está programada para el lunes por la tarde. ¿Te puedo ayudar con algo más?  
-**Usuario:** No, gracias.  
-**Bot:** ¡Un placer atenderte! Si necesitas más ayuda, solo escribe `/start`. ¡Que tengas un excelente día!  
+  El bot debe reutilizar los datos que el usuario ya haya proporcionado.
+
+  Estado de pedido
+  Dato requerido: número de pedido.
+  Formato: exactamente 4 dígitos.
+
+  Ejemplo:
+  - Usuario: ¿Dónde está mi pedido 5678?
+
+  El bot debe detectar 5678 y consultar directamente el pedido.
+
+  No debe responder: "Por favor, dime tu número de pedido."
+  Si el número ya está presente en el mensaje.
+
+  Solicitud sin número
+  Si el usuario escribe:
+  - "Quiero saber dónde está mi pedido."
+
+  El bot debe solicitar el dato faltante:
+  - "Claro. Indícame tu número de pedido de 4 dígitos. Por ejemplo: 1042."
+
+  Validación
+  Se aceptan únicamente identificadores que cumplan:
+  ^\d{4}$
+
+  Ejemplos válidos:
+  - 1042
+  - 5678
+  - 0001
+
+  Ejemplos inválidos:
+  - 123
+  - 12345
+  - 12AB
+  - pedido 1234 cuando el número no pueda extraerse correctamente.
+
+  Si el número puede extraerse inequívocamente del mensaje, se reutiliza como slot de pedido.
+
+## 4. Dialogo de muestra (Camino Feliz)
+  Usuario: /start
+
+  Bot: 
+  ¡Hola! 👋 Soy el asistente virtual de TechShift.
+
+  Puedo ayudarte a consultar el estado de un pedido o revisar nuestro catálogo.
+
+  ¿Qué deseas hacer?
+
+  Botones:
+
+  📦 Consultar pedido
+  🛍️ Ver catálogo
+  ❓ Ayuda
+  👤 Soporte
+
+  Usuario: Quiero ver el estado de mi pedido.
+
+  Bot:
+  Con gusto. Indícame tu número de pedido de 4 dígitos.
+  Ejemplo: 1042
+
+  Usuario: 1042
+
+  Bot:
+  Tu pedido #1042 se encuentra En tránsito.
+
+  La fecha estimada de entrega es lunes por la tarde.
+
+  ¿Deseas realizar otra consulta?
+
+  Botones:
+
+  📦 Consultar pedido
+  🛍️ Ver catálogo
+  ❓ Ayuda
+  👤 Soporte
+  ❌ Cancelar
+
+  Usuario: No, gracias.
+
+  Bot:
+  ¡Con gusto! 👋 Cuando necesites ayuda, puedes escribir /start.
 
 ---
 
-## 4. Diagrama de Flujo de la Conversación
+## 5. Diagrama de Flujo de la Conversación
 
 ```mermaid
 flowchart TD
-    Start([Usuario envía mensaje]) --> CheckCmd{¿Es /start o saludo?}
-    
-    CheckCmd -- Sí --> Welcome[Bot: Bienvenida + Menú de opciones]
-    CheckCmd -- No --> CheckIntent{Evaluar intención}
-    
-    CheckIntent -- /pedido o 'rastrear' --> AskOrder[Bot: Solicita número de pedido]
-    CheckIntent -- /catalogo o 'productos' --> CallCatalog[Consulta API Catálogo] --> ShowCatalog[Bot: Muestra listado de productos]
-    CheckIntent -- /cancel --> CancelOp[Bot: Operación cancelada. Escribe /start]
-    CheckIntent -- /help o no reconocido --> ShowHelp[Bot: No entendí. Opciones disponibles: /pedido, /catalogo, /cancel]
-    
-    AskOrder --> ReceiveOrder[Usuario envía código]
-    ReceiveOrder --> ValidateOrder{¿Es número de 4 dígitos?}
-    
-    ValidateOrder -- No --> ErrorFormat[Bot: Formato inválido. Debe ser de 4 números. Reintenta o /cancel]
-    ErrorFormat --> AskOrder
-    
-    ValidateOrder -- Sí --> QueryAPI[Consultar API de Pedidos]
-    QueryAPI --> ExistOrder{¿Pedido existe?}
-    
-    ExistOrder -- No --> ErrorNotFound[Bot: El pedido no existe. Verifica o escribe /cancel]
-    ErrorNotFound --> AskOrder
-    
-    ExistOrder -- Sí --> ShowStatus[Bot: Estado del pedido + Ofrecer continuar]
-    
-    ShowStatus --> EndFlow([Fin de turno / Espera nueva acción])
-    ShowCatalog --> EndFlow
-    Welcome --> EndFlow
-    CancelOp --> EndFlow
-    ShowHelp --> EndFlow
+
+    Start([Usuario envía mensaje]) --> GlobalCmd{¿Comando global?}
+
+    GlobalCmd -- /cancel --> CancelOp[Cancelar operación actual]
+    CancelOp --> Menu
+
+    GlobalCmd -- /help --> Help[Mostrar comandos disponibles]
+    Help --> Menu
+
+    GlobalCmd -- No --> Intent{Detectar intención}
+
+    Intent -- /start --> Menu[Bienvenida + menú]
+    Intent -- pedido --> HasOrder{¿Ya incluyó número de pedido?}
+    Intent -- catálogo --> HasProduct{¿Ya indicó producto?}
+    Intent -- soporte --> Support[Mostrar información de soporte]
+    Intent -- desconocido --> Unknown[Incrementar intentos desconocidos]
+
+    Unknown --> UnknownCount{¿Menos de 3 intentos?}
+    UnknownCount -- Sí --> Menu
+    UnknownCount -- No --> Support
+
+    HasOrder -- No --> AskOrder[Solicitar número de pedido]
+    AskOrder --> ReceiveOrder[Usuario envía mensaje]
+    ReceiveOrder --> OrderGlobal{¿/cancel o /help?}
+
+    OrderGlobal -- /cancel --> CancelOp
+    OrderGlobal -- /help --> Help
+    OrderGlobal -- No --> ValidateOrder{¿Número de exactamente 4 dígitos?}
+
+    HasOrder -- Sí --> QueryOrder
+    ValidateOrder -- Sí --> QueryOrder[Consultar API de pedidos]
+
+    ValidateOrder -- No --> OrderAttempts[Incrementar intentos]
+    OrderAttempts --> OrderCount{¿Menos de 3?}
+    OrderCount -- Sí --> AskOrder
+    OrderCount -- No --> Support
+
+    QueryOrder --> OrderAPI{¿API respondió?}
+
+    OrderAPI -- No --> APIError[Informar problema temporal]
+    APIError --> Menu
+
+    OrderAPI -- Sí --> OrderExists{¿Pedido existe?}
+
+    OrderExists -- No --> NotFound[Pedido no encontrado]
+    NotFound --> NotFoundCount{¿Menos de 3 intentos?}
+    NotFoundCount -- Sí --> AskOrder
+    NotFoundCount -- No --> Support
+
+    OrderExists -- Sí --> ShowStatus[Mostrar estado y fecha estimada]
+    ShowStatus --> Menu
+
+    HasProduct -- No --> AskProduct[Solicitar nombre del producto]
+    AskProduct --> ProductInput[Usuario proporciona producto]
+    ProductInput --> QueryCatalog[Consultar API de catálogo]
+
+    HasProduct -- Sí --> QueryCatalog
+
+    QueryCatalog --> CatalogAPI{¿API respondió?}
+    CatalogAPI -- No --> CatalogError[Informar problema temporal]
+    CatalogError --> Menu
+
+    CatalogAPI -- Sí --> ShowProducts[Mostrar productos encontrados]
+    ShowProducts --> Menu
+
+    Support --> Menu
