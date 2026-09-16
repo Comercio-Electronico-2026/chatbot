@@ -300,6 +300,17 @@ function extractDate(string $text): ?string
     return null;
 }
 
+function isValidDateInput(string $text): bool
+{
+    $value = trim($text);
+    $weekdays = 'lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo';
+    $month = '[a-záéíóú]+(?:\s+de\s+\d{4})?';
+
+    return preg_match('/^\d{1,2}[\/-]\d{1,2}(?:[\/-]\d{2,4})?$/', $value) === 1
+        || preg_match('/^(?:' . $weekdays . ')\s+\d{1,2}$/iu', $value) === 1
+        || preg_match('/^(?:' . $weekdays . ')?\s*\d{1,2}\s+de\s+' . $month . '$/iu', $value) === 1;
+}
+
 function beginAppointment(string $token, string $chatId, array &$chat, string $text): void
 {
     $chat = ['step' => 'appointment_service', 'attempts' => 0, 'data' => []];
@@ -376,8 +387,8 @@ function handleStep(string $token, string $chatId, array &$state, array &$chat, 
             return;
 
         case 'appointment_date':
-            if (strlen($value) < 3) {
-                retryOrHuman($token, $chatId, $chat, 'No pude interpretar la fecha. Incluye el dia y, si es posible, el mes.');
+            if (!isValidDateInput($value)) {
+                retryOrHuman($token, $chatId, $chat, 'No pude interpretar la fecha. Usa un formato como "jueves 11 de septiembre" o "11/09/2026".');
                 return;
             }
             $chat['data']['date'] = $value;
@@ -420,7 +431,7 @@ function handleStep(string $token, string $chatId, array &$state, array &$chat, 
             sendMessage(
                 $token,
                 $chatId,
-                'Cita confirmada: ' . appointmentSummary($appointment) . ".\nTe enviaremos un recordatorio un dia antes. ¿Necesitas algo mas?",
+                'Cita confirmada: ' . appointmentSummary($appointment) . ".\n¿Necesitas algo mas?",
                 mainMenu()
             );
             resetChat($chat);
@@ -486,8 +497,8 @@ function handleStep(string $token, string $chatId, array &$state, array &$chat, 
             return;
 
         case 'reschedule_date':
-            if (strlen($value) < 3) {
-                retryOrHuman($token, $chatId, $chat, 'No pude interpretar la nueva fecha.');
+            if (!isValidDateInput($value)) {
+                retryOrHuman($token, $chatId, $chat, 'No pude interpretar la nueva fecha. Usa un formato como "jueves 11 de septiembre" o "11/09/2026".');
                 return;
             }
             $id = (string) $chat['data']['appointment_id'];
@@ -537,6 +548,33 @@ function redactForModel(string $text): string
     $text = preg_replace('/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/', '[correo omitido]', $text) ?? $text;
     $text = preg_replace('/(?:\+?\d[\d\s-]{6,}\d)/', '[telefono omitido]', $text) ?? $text;
     return trim($text);
+}
+
+function isGibberish(string $text): bool
+{
+    $value = trim($text);
+    if ($value === '' || preg_match('/[a-záéíóúñ]{3,}/iu', $value) !== 1) {
+        return true;
+    }
+
+    return preg_match('/^(?:asdf+|qwerty+|zxcv+|[.\-_*]+)$/iu', $value) === 1;
+}
+
+function isDentalPreparationQuestion(string $text): bool
+{
+    return str_contains($text, 'limpieza')
+        && (str_contains($text, 'antes')
+            || str_contains($text, 'prepar')
+            || str_contains($text, 'previo')
+            || str_contains($text, 'debo hacer'));
+}
+
+function dentalPreparationMessage(): string
+{
+    return 'Antes de una limpieza dental rutinaria, cepillate y usa hilo dental normalmente. '
+        . 'Generalmente no se requiere ayuno, pero informa al odontologo sobre medicamentos, '
+        . 'alergias o condiciones medicas. Llega unos minutos antes y sigue las indicaciones '
+        . 'de la clinica. Si tienes una condicion especifica, confirmala con tu odontologo.';
 }
 
 function ollamaAnswer(string $text, array $config): ?string
@@ -616,6 +654,33 @@ function processMessage(string $token, array $config, array &$state, string $cha
     }
 
     if ($chat['step'] !== 'idle') {
+        if (str_contains($normalized, 'cancelar cita')) {
+            $chat['step'] = 'cancel_id';
+            $chat['attempts'] = 0;
+            sendStepQuestion($token, $chatId, $chat['step']);
+            saveState($state);
+            return;
+        }
+        if (str_contains($normalized, 'reprogramar') || str_contains($normalized, 'cambiar la hora')) {
+            $chat['step'] = 'reschedule_id';
+            $chat['attempts'] = 0;
+            sendStepQuestion($token, $chatId, $chat['step']);
+            saveState($state);
+            return;
+        }
+        if (str_contains($normalized, 'consultar mis citas')) {
+            $chat['step'] = 'consult_phone';
+            $chat['attempts'] = 0;
+            sendStepQuestion($token, $chatId, $chat['step']);
+            saveState($state);
+            return;
+        }
+        if (str_contains($normalized, 'horario') || str_contains($normalized, 'ubicacion')) {
+            resetChat($chat);
+            sendMessage($token, $chatId, 'La Clinica Sonrisa Sana atiende de lunes a viernes. Recepcion puede confirmar la ubicacion y el horario vigente.', mainMenu());
+            saveState($state);
+            return;
+        }
         handleStep($token, $chatId, $state, $chat, $value);
         saveState($state);
         return;
@@ -651,6 +716,16 @@ function processMessage(string $token, array $config, array &$state, string $cha
     }
     if (str_contains($normalized, 'humano') || str_contains($normalized, 'recepcion')) {
         sendMessage($token, $chatId, 'Registré tu solicitud para recepcion. Una persona del equipo te contactara.', mainMenu());
+        return;
+    }
+
+    if (isGibberish($value)) {
+        sendMessage($token, $chatId, 'No pude entender ese mensaje. Usa los botones o escribe /ayuda para ver las opciones.', mainMenu());
+        return;
+    }
+
+    if (isDentalPreparationQuestion($normalized)) {
+        sendMessage($token, $chatId, dentalPreparationMessage(), mainMenu());
         return;
     }
 
