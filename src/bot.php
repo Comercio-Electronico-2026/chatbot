@@ -19,11 +19,8 @@ if (!$env || empty($env['BOT_TOKEN'])) {
 $token = $env['BOT_TOKEN'];
 $apiUrl = "https://api.telegram.org/bot" . $token;
 
-$wcConsumerKey =
-    $env['WC_CONSUMER_KEY'] ?? '';
-
-$wcConsumerSecret =
-    $env['WC_CONSUMER_SECRET'] ?? '';
+$wcConsumerKey = $env['WC_CONSUMER_KEY'] ?? '';
+$wcConsumerSecret = $env['WC_CONSUMER_SECRET'] ?? '';
 
 $storeApiUrl =
     "https://tienda.hv21011.duckdns.org/wp-json/wc/store/v1/products";
@@ -91,14 +88,48 @@ function telegramRequest(string $method, array $params = []): ?array
 }
 
 
-function sendMessage(string|int $chatId, string $text): bool
-{
-    $response = telegramRequest('sendMessage', [
+function sendMessage(
+    string|int $chatId,
+    string $text,
+    ?array $replyMarkup = null
+): bool {
+    $params = [
         'chat_id' => $chatId,
         'text' => $text,
-    ]);
+    ];
+
+    if ($replyMarkup !== null) {
+        $params['reply_markup'] = json_encode(
+            $replyMarkup,
+            JSON_UNESCAPED_UNICODE
+        );
+    }
+
+    $response = telegramRequest(
+        'sendMessage',
+        $params
+    );
 
     return $response !== null;
+}
+
+
+function getYesNoKeyboard(): array
+{
+    return [
+        'inline_keyboard' => [
+            [
+                [
+                    'text' => 'Sí',
+                    'callback_data' => 'switch_yes',
+                ],
+                [
+                    'text' => 'No',
+                    'callback_data' => 'switch_no',
+                ],
+            ],
+        ],
+    ];
 }
 
 
@@ -643,11 +674,10 @@ function fetchOrder(int $orderId): array
         ];
     }
 
-    $httpCode =
-        curl_getinfo(
-            $ch,
-            CURLINFO_HTTP_CODE
-        );
+    $httpCode = curl_getinfo(
+        $ch,
+        CURLINFO_HTTP_CODE
+    );
 
     curl_close($ch);
 
@@ -776,19 +806,95 @@ while (true) {
 
         $updateId = $update['update_id'];
 
-        $message = trim(
-            $update['message']['text'] ?? ''
-        );
+        $callbackQuery =
+            $update['callback_query'] ?? null;
 
-        $chatId =
-            $update['message']['chat']['id'] ?? null;
+        $isCallback = false;
 
-        if ($chatId === null) {
-            continue;
+
+        // ------------------------------------------------
+        // Botón inline pulsado
+        // ------------------------------------------------
+
+        if ($callbackQuery !== null) {
+
+            $isCallback = true;
+
+            $chatId =
+                $callbackQuery['message']['chat']['id']
+                ?? null;
+
+            $from =
+                $callbackQuery['from'] ?? [];
+
+            $callbackData =
+                $callbackQuery['data'] ?? '';
+
+            if ($chatId === null) {
+                continue;
+            }
+
+            telegramRequest(
+                'answerCallbackQuery',
+                [
+                    'callback_query_id' =>
+                        $callbackQuery['id'],
+                ]
+            );
+
+            $messageId =
+                $callbackQuery['message']['message_id']
+                ?? null;
+
+            if ($messageId !== null) {
+                telegramRequest(
+                    'editMessageReplyMarkup',
+                    [
+                        'chat_id' => $chatId,
+                        'message_id' => $messageId,
+                        'reply_markup' =>
+                            json_encode([
+                                'inline_keyboard' => [],
+                            ]),
+                    ]
+                );
+            }
+
+            if ($callbackData === 'switch_yes') {
+                $message = 'Sí';
+            } elseif ($callbackData === 'switch_no') {
+                $message = 'No';
+            } else {
+                continue;
+            }
+
+
+        // ------------------------------------------------
+        // Mensaje normal
+        // ------------------------------------------------
+
+        } else {
+
+            $message = trim(
+                $update['message']['text'] ?? ''
+            );
+
+            $chatId =
+                $update['message']['chat']['id']
+                ?? null;
+
+            if ($chatId === null) {
+                continue;
+            }
+
+            $from =
+                $update['message']['from'] ?? [];
         }
 
-        $from =
-            $update['message']['from'] ?? [];
+
+        // ------------------------------------------------
+        // Datos básicos del usuario
+        // ------------------------------------------------
 
         $firstName =
             trim($from['first_name'] ?? '');
@@ -901,6 +1007,40 @@ while (true) {
 
         if ($command === '/catalogo') {
 
+            $currentSession =
+                loadSession($chatId);
+
+            if (
+                ($currentSession['state'] ?? '') ===
+                'awaiting_order'
+            ) {
+
+                saveSession(
+                    $chatId,
+                    [
+                        'state' => 'confirm_switch',
+                        'from' => 'order',
+                        'to' => 'catalog',
+                        'previous_state' =>
+                            'awaiting_order',
+                        'previous_attempts' =>
+                            $currentSession['attempts'] ?? 0,
+                        'pending_argument' => $argument,
+                        'switch_attempts' => 0,
+                    ]
+                );
+
+                sendMessage(
+                    $chatId,
+                    "Estabas consultando un pedido.\n\n" .
+                    "¿Deseas cambiar a la búsqueda " .
+                    "del catálogo?",
+                    getYesNoKeyboard()
+                );
+
+                continue;
+            }
+
             clearSession($chatId);
 
             if ($argument !== '') {
@@ -913,12 +1053,22 @@ while (true) {
                     $result['text']
                 );
 
-                if ($result['status'] !== 'success') {
+                if ($result['status'] === 'empty') {
                     saveSession(
                         $chatId,
                         [
                             'state' => 'awaiting_catalog',
                             'attempts' => 1,
+                        ]
+                    );
+                }
+
+                if ($result['status'] === 'error') {
+                    saveSession(
+                        $chatId,
+                        [
+                            'state' => 'awaiting_catalog',
+                            'attempts' => 0,
                         ]
                     );
                 }
@@ -951,6 +1101,40 @@ while (true) {
 
         if ($command === '/pedido') {
 
+            $currentSession =
+                loadSession($chatId);
+
+            if (
+                ($currentSession['state'] ?? '') ===
+                'awaiting_catalog'
+            ) {
+
+                saveSession(
+                    $chatId,
+                    [
+                        'state' => 'confirm_switch',
+                        'from' => 'catalog',
+                        'to' => 'order',
+                        'previous_state' =>
+                            'awaiting_catalog',
+                        'previous_attempts' =>
+                            $currentSession['attempts'] ?? 0,
+                        'pending_argument' => $argument,
+                        'switch_attempts' => 0,
+                    ]
+                );
+
+                sendMessage(
+                    $chatId,
+                    "Estabas buscando en el catálogo.\n\n" .
+                    "¿Deseas cambiar a la consulta " .
+                    "de pedidos?",
+                    getYesNoKeyboard()
+                );
+
+                continue;
+            }
+
             clearSession($chatId);
 
             if ($argument !== '') {
@@ -972,6 +1156,16 @@ while (true) {
                         [
                             'state' => 'awaiting_order',
                             'attempts' => 1,
+                        ]
+                    );
+                }
+
+                if ($result['status'] === 'error') {
+                    saveSession(
+                        $chatId,
+                        [
+                            'state' => 'awaiting_order',
+                            'attempts' => 0,
                         ]
                     );
                 }
@@ -1002,6 +1196,292 @@ while (true) {
         // ------------------------------------------------
 
         $session = loadSession($chatId);
+
+        if (
+            $isCallback &&
+            $session['state'] !== 'confirm_switch'
+        ) {
+            continue;
+        }
+
+
+        // ------------------------------------------------
+        // Confirmación de cambio de intención
+        // ------------------------------------------------
+
+        if ($session['state'] === 'confirm_switch') {
+
+            $answer = strtolower(
+                trim($message)
+            );
+
+            if (
+                $answer === 'sí' ||
+                $answer === 'si'
+            ) {
+
+                $target =
+                    $session['to'] ?? '';
+
+                $pendingArgument =
+                    trim(
+                        $session['pending_argument'] ?? ''
+                    );
+
+                clearSession($chatId);
+
+
+                // Cambiar hacia catálogo
+                if ($target === 'catalog') {
+
+                    if ($pendingArgument !== '') {
+
+                        $result =
+                            performCatalogSearch(
+                                $pendingArgument
+                            );
+
+                        sendMessage(
+                            $chatId,
+                            $result['text']
+                        );
+
+                        if ($result['status'] === 'empty') {
+                            saveSession(
+                                $chatId,
+                                [
+                                    'state' =>
+                                        'awaiting_catalog',
+                                    'attempts' => 1,
+                                ]
+                            );
+                        }
+
+                        if ($result['status'] === 'error') {
+                            saveSession(
+                                $chatId,
+                                [
+                                    'state' =>
+                                        'awaiting_catalog',
+                                    'attempts' => 0,
+                                ]
+                            );
+                        }
+
+                        continue;
+                    }
+
+                    saveSession(
+                        $chatId,
+                        [
+                            'state' => 'awaiting_catalog',
+                            'attempts' => 0,
+                        ]
+                    );
+
+                    sendMessage(
+                        $chatId,
+                        "Perfecto, cambiemos al catálogo 🎵.\n\n" .
+                        "Escribe el nombre del artista " .
+                        "o álbum que deseas buscar."
+                    );
+
+                    continue;
+                }
+
+
+                // Cambiar hacia pedido
+                if ($target === 'order') {
+
+                    if ($pendingArgument !== '') {
+
+                        $result =
+                            performOrderSearch(
+                                $pendingArgument
+                            );
+
+                        sendMessage(
+                            $chatId,
+                            $result['text']
+                        );
+
+                        if (
+                            $result['status'] === 'invalid' ||
+                            $result['status'] === 'not_found'
+                        ) {
+                            saveSession(
+                                $chatId,
+                                [
+                                    'state' =>
+                                        'awaiting_order',
+                                    'attempts' => 1,
+                                ]
+                            );
+                        }
+
+                        if ($result['status'] === 'error') {
+                            saveSession(
+                                $chatId,
+                                [
+                                    'state' =>
+                                        'awaiting_order',
+                                    'attempts' => 0,
+                                ]
+                            );
+                        }
+
+                        continue;
+                    }
+
+                    saveSession(
+                        $chatId,
+                        [
+                            'state' => 'awaiting_order',
+                            'attempts' => 0,
+                        ]
+                    );
+
+                    sendMessage(
+                        $chatId,
+                        "Perfecto, cambiemos a pedidos 📦.\n\n" .
+                        "¿Cuál es el número de tu pedido?"
+                    );
+
+                    continue;
+                }
+            }
+
+
+            if ($answer === 'no') {
+
+                $previousState =
+                    $session['previous_state'] ?? 'menu';
+
+                $previousAttempts =
+                    (int) (
+                        $session['previous_attempts'] ?? 0
+                    );
+
+                if ($previousState === 'awaiting_catalog') {
+
+                    saveSession(
+                        $chatId,
+                        [
+                            'state' => 'awaiting_catalog',
+                            'attempts' => $previousAttempts,
+                        ]
+                    );
+
+                    sendMessage(
+                        $chatId,
+                        "De acuerdo, continuemos con " .
+                        "la búsqueda del catálogo 🎵.\n\n" .
+                        "Escribe el nombre del artista " .
+                        "o álbum que deseas buscar."
+                    );
+
+                    continue;
+                }
+
+                if ($previousState === 'awaiting_order') {
+
+                    saveSession(
+                        $chatId,
+                        [
+                            'state' => 'awaiting_order',
+                            'attempts' => $previousAttempts,
+                        ]
+                    );
+
+                    sendMessage(
+                        $chatId,
+                        "De acuerdo, continuemos con " .
+                        "la consulta del pedido 📦.\n\n" .
+                        "Escribe el número del pedido."
+                    );
+
+                    continue;
+                }
+
+                clearSession($chatId);
+
+                sendMessage(
+                    $chatId,
+                    getMenuText($firstName)
+                );
+
+                continue;
+            }
+
+
+            $session['switch_attempts'] =
+                ($session['switch_attempts'] ?? 0) + 1;
+
+            if ($session['switch_attempts'] >= 3) {
+
+                $previousState =
+                    $session['previous_state'] ?? 'menu';
+
+                $previousAttempts =
+                    (int) (
+                        $session['previous_attempts'] ?? 0
+                    );
+
+                if ($previousState === 'awaiting_catalog') {
+
+                    saveSession(
+                        $chatId,
+                        [
+                            'state' => 'awaiting_catalog',
+                            'attempts' => $previousAttempts,
+                        ]
+                    );
+
+                    sendMessage(
+                        $chatId,
+                        "No pude confirmar el cambio de tema.\n\n" .
+                        "Mantendremos la búsqueda del catálogo. " .
+                        "Escribe un artista o álbum."
+                    );
+
+                    continue;
+                }
+
+                if ($previousState === 'awaiting_order') {
+
+                    saveSession(
+                        $chatId,
+                        [
+                            'state' => 'awaiting_order',
+                            'attempts' => $previousAttempts,
+                        ]
+                    );
+
+                    sendMessage(
+                        $chatId,
+                        "No pude confirmar el cambio de tema.\n\n" .
+                        "Mantendremos la consulta del pedido. " .
+                        "Escribe el número del pedido."
+                    );
+
+                    continue;
+                }
+            }
+
+            saveSession(
+                $chatId,
+                $session
+            );
+
+            sendMessage(
+                $chatId,
+                "No pude reconocer esa respuesta.\n\n" .
+                "Por favor, elige Sí o No.",
+                getYesNoKeyboard()
+            );
+
+            continue;
+        }
 
 
         // ------------------------------------------------
