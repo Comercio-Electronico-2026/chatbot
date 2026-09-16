@@ -2,6 +2,23 @@
 
 Repositorio del proyecto de bot de Telegram (Laboratorios 5a y 5b).
 
+## Bot (Lab 5b)
+
+Bot del asistente de tienda: pedidos, catálogo (REST externa FakeStoreAPI),
+clima (REST externa Open-Meteo), soporte humano y conversación abierta con un
+LLM por endpoint OpenAI-compatible (patrón híbrido: reglas para acciones
+críticas, LLM solo para lo que no calza con ninguna intención).
+
+- Código y manual de ejecución: `src/README.md`
+- Diseño conversacional: `docs/diseno-conversacional.md`
+- Pruebas de la Sesión 2: `docs/pruebas-5b.md`
+
+```bash
+cp .env.example .env   # rellenar BOT_TOKEN (nunca subirlo)
+php src/poll.php       # desarrollo local (long polling)
+php src/setWebhook.php # producción (webhook HTTPS, dominio del Lab 3)
+```
+
 ## Cómo trabajar
 
 1. Crea tu rama: `git switch -c alumno/<TU_CARNET>` (carnet en MAYUSCULAS).
