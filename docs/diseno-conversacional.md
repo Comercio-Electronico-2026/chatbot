@@ -1,4 +1,5 @@
 # Diseño conversacional - Tienda de computadoras
+
 ## Lista de chequeo
 
 - **¿Quién usará el chatbot?** Clientes que quieren comprar computadoras, accesorios o consultar productos de la tienda.
@@ -8,7 +9,7 @@
 - **¿Qué tipo de respuesta espero en cada caso?** Texto para describir productos, números para precios y existencias, y listas de opciones para elegir categorías, tipo de uso o presupuesto.
 - **Edad, ocupación, intereses y experiencia con tecnología:** Personas de 16 años en adelante, estudiantes, profesionales y público general. El nivel de experiencia con tecnología puede variar, por eso el bot debe usar palabras sencillas.
 - **Escenarios alternativos:** Producto no encontrado, producto sin existencias, entrada vacía, mensaje no entendido, cambio de tema, petición fuera de alcance, falla de la API o cancelación de la consulta.
-- **UI y accesibilidad:** Mensajes cortos, opciones claras, lenguaje sencillo, precios expresados en dólares y comandos visibles como `ayuda`, `volver` y `cancelar`.
+- **UI y accesibilidad:** Mensajes cortos, opciones claras, lenguaje sencillo, precios expresados en dólares y comandos visibles como `/ayuda`, `/volver` y `/cancelar`.
 - **¿Cómo validar el prototipo?** Se probará con compañeros usando el ejercicio de Mago de Oz: una consulta normal y otra con errores, cambio de tema y preguntas fuera del alcance del bot.
 - **Pruebas de usabilidad y desempeño:** Se verificará que el usuario pueda encontrar un producto sin ayuda, que entienda los mensajes de error y que el bot responda de forma clara.
 - **Privacidad:** El bot no solicitará ni almacenará datos personales para consultar el catálogo. Si el usuario brinda información, se utilizará solamente para responder la consulta actual.
@@ -23,8 +24,8 @@
 | Pedir recomendación | “Necesito una computadora para estudiar con $700” | Media | 2 | Catálogo: equipos según uso y presupuesto. |
 | Consultar accesorios | “¿Tienen mouse inalámbrico?” | Media | 2 | API de catálogo: accesorios disponibles. |
 | Pedir ayuda o menú | “Ayuda”, “Menú” o `/start` | Media | 2 | No requiere API; muestra opciones y ejemplos. |
-| Volver atrás | “Volver” | Baja | 2 | No requiere API; regresa al menú principal. |
-| Cancelar consulta | “Cancelar” | Baja | 2 | No requiere API; termina la consulta actual. |
+| Volver atrás | “Volver” o `/volver` | Baja | 2 | No requiere API; regresa al menú principal. |
+| Cancelar consulta | “Cancelar” o `/cancelar` | Baja | 2 | No requiere API; termina la consulta actual. |
 | Pedir atención humana | “Quiero hablar con una persona” | Baja | 3 | No requiere API; muestra información de contacto. |
 
 ## Diagrama de flujo de la conversación
@@ -37,21 +38,29 @@ flowchart TD
     C -->|Disponibilidad o precio| D{¿El usuario indicó el producto?}
     D -->|Sí| E[Consultar catálogo]
     D -->|No| F[Bot pide solo el dato que falta]
-    F --> E
+    D -->|Cambio de tema| C
+    F -->|Dato válido| E
+    F -->|Cambio de tema| C
 
     E --> G{¿La API respondió?}
     G -->|Sí, hay existencias| H[Bot muestra precio y disponibilidad]
     G -->|Sí, sin existencias| I[Bot informa que no hay existencias y ofrece alternativas]
     G -->|Producto no encontrado| J[Bot informa que no encontró el producto y muestra categorías]
-    G -->|No| K[Bot informa que no puede consultar el catálogo y ofrece reintentar]
+    G -->|No| K[Bot informa fallo temporal y ofrece reintentar o volver al menú]
+    K -->|Reintentar| E
+    K -->|Volver al menú| U
 
     C -->|Categoría| L[Bot muestra productos de la categoría]
-    C -->|Recomendación| M[Bot pregunta para qué usará el equipo y cuál es su presupuesto]
-    M --> N[Bot recomienda productos disponibles]
+    C -->|Recomendación| M[Bot pregunta para qué usará la computadora y cuál es su presupuesto]
+    M -->|Datos completos| N[Bot recomienda productos disponibles]
+    M -->|Cambio de tema| C
     C -->|Ayuda| O[Bot muestra ejemplos de preguntas]
     C -->|Volver| B
     C -->|Cancelar| P[Bot confirma el cierre de la consulta]
     C -->|Petición fuera de alcance| Q[Bot explica lo que puede hacer y ofrece atención humana]
+    C -->|Atención humana| V[Bot comparte el contacto de atención humana]
+    Q -->|Solicita atención| V
+    Q -->|Volver al menú| U
     C -->|Mensaje vacío o no entendido| R{¿Ha fallado menos de 3 veces?}
 
     R -->|Sí| S[Bot muestra ejemplos y opciones válidas]
@@ -65,18 +74,26 @@ flowchart TD
     N --> U
     O --> U
     Q --> U
+    V --> U
 
     S --> B
     T --> B
     U -->|Sí| B
     U -->|No| P
+
+    X[Comandos globales: /ayuda, /volver, /cancelar] --> C
+    D -.-> X
+    F -.-> X
+    E -.-> X
+    M -.-> X
+    R -.-> X
+    Q -.-> X
+    U -.-> X
 ```
 
-Ahora durante la conversación, en cualquier momento el usuario puede escribir `ayuda`, `volver` o `cancelar`. Si cambia de tema, el bot va a reconocer la nueva intención y vuelve al menú correspondiente.
+Durante cualquier parte de la conversación, el usuario puede escribir `/ayuda`, `/volver` o `/cancelar`. Estos comandos interrumpen el estado actual: `/ayuda` muestra ejemplos, `/volver` regresa al menú principal y `/cancelar` termina la consulta. Si cambia de tema, el bot reconoce la nueva intención y vuelve al reconocedor de intenciones.
 
 ## Diálogo de muestra - camino feliz
-
-> **Corrección aplicada:** ahora la bienvenida explica mejor las funciones del bot, contiene ejemplos de preguntas y se evita pedir nuevamente datos que el usuario ya había dado.
 
 **Usuario:** `/start`
 
