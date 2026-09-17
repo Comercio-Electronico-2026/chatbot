@@ -2,231 +2,176 @@
 
 declare(strict_types=1);
 
-const TELEGRAM_API_BASE = 'https://api.telegram.org';
-const POLLING_TIMEOUT_SECONDS = 25;
-const POLLING_HTTP_TIMEOUT_SECONDS = POLLING_TIMEOUT_SECONDS + 25;
-const STANDARD_HTTP_TIMEOUT_SECONDS = 15;
+require_once __DIR__ . '/services.php';
+require_once __DIR__ . '/state.php';
+require_once __DIR__ . '/conversation.php';
 
-/**
- * Carga variables sencillas desde .env sin requerir dependencias externas.
- */
-function loadEnvironment(string $path): void
+umask(0077);
+ini_set('display_errors', '0');
+
+function handleUpdate(array $update, ChatStore $store, string $dataDirectory): void
 {
-    if (!is_file($path)) {
-        throw new RuntimeException(
-            'No se encontró .env. Copia .env.example como .env y agrega BOT_TOKEN.'
-        );
+    $callback = $update['callback_query'] ?? null;
+    $message = $callback['message'] ?? $update['message'] ?? null;
+    if (!is_array($message) || !isset($message['chat']['id'], $update['update_id'])) {
+        return;
     }
-
-    $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-
-    if ($lines === false) {
-        throw new RuntimeException('No fue posible leer el archivo .env.');
-    }
-
-    foreach ($lines as $line) {
-        $line = trim($line);
-
-        if ($line === '' || str_starts_with($line, '#')) {
-            continue;
-        }
-
-        [$name, $value] = array_pad(explode('=', $line, 2), 2, '');
-        $name = trim($name);
-        $value = trim($value, " \t\n\r\0\x0B\"'");
-
-        if (!preg_match('/^[A-Z_][A-Z0-9_]*$/', $name)) {
-            continue;
-        }
-
-        if (getenv($name) === false) {
-            putenv("{$name}={$value}");
+    $chatId = (string) $message['chat']['id'];
+    $updateId = (int) $update['update_id'];
+    $text = $callback === null ? (string) ($message['text'] ?? '') : '';
+    $callbackData = $callback === null ? null : (string) ($callback['data'] ?? '');
+    if ($callback !== null && isset($callback['id'])) {
+        try {
+            telegramRequest('answerCallbackQuery', ['callback_query_id' => $callback['id']]);
+        } catch (ServiceFailure $failure) {
+            logEvent($dataDirectory . '/logs', 'Error al confirmar botón', ['servicio' => $failure->service, 'http' => $failure->status]);
         }
     }
-}
-
-/**
- * Ejecuta una solicitud a Telegram y devuelve solamente el campo result.
- *
- * @return mixed
- */
-function telegramRequest(string $token, string $method, array $parameters = []): mixed
-{
-    $url = TELEGRAM_API_BASE . "/bot{$token}/{$method}";
-    $handle = curl_init($url);
-    $httpTimeout = $method === 'getUpdates'
-        ? POLLING_HTTP_TIMEOUT_SECONDS
-        : STANDARD_HTTP_TIMEOUT_SECONDS;
-
-    if ($handle === false) {
-        throw new RuntimeException('No fue posible iniciar la conexión con Telegram.');
-    }
-
-    curl_setopt_array($handle, [
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => $parameters,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_CONNECTTIMEOUT => 10,
-        CURLOPT_TIMEOUT => $httpTimeout,
-    ]);
-
-    $response = curl_exec($handle);
-
-    if ($response === false) {
-        $error = curl_error($handle);
-        curl_close($handle);
-        throw new RuntimeException("Error de conexión con Telegram: {$error}");
-    }
-
-    $statusCode = curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
-    curl_close($handle);
-
-    try {
-        $data = json_decode($response, true, 512, JSON_THROW_ON_ERROR);
-    } catch (JsonException) {
-        throw new RuntimeException('Telegram devolvió una respuesta que no es JSON válido.');
-    }
-
-    if ($statusCode !== 200 || !($data['ok'] ?? false)) {
-        $description = $data['description'] ?? 'Error desconocido de Telegram.';
-        throw new RuntimeException("Telegram rechazó la solicitud: {$description}");
-    }
-
-    return $data['result'];
-}
-
-function isStartCommand(string $text): bool
-{
-    return preg_match('/^\/start(?:@[A-Za-z0-9_]+)?(?:\s|$)/i', trim($text)) === 1;
-}
-
-function compactLogText(string $text, int $maximumLength = 200): string
-{
-    $singleLineText = preg_replace('/\s+/u', ' ', trim($text));
-
-    if ($singleLineText === null) {
-        return '[texto no válido]';
-    }
-
-    if (function_exists('mb_strlen') && function_exists('mb_substr')) {
-        return mb_strlen($singleLineText) > $maximumLength
-            ? mb_substr($singleLineText, 0, $maximumLength) . '…'
-            : $singleLineText;
-    }
-
-    return strlen($singleLineText) > $maximumLength
-        ? substr($singleLineText, 0, $maximumLength) . '...'
-        : $singleLineText;
-}
-
-function detectMessageType(array $message): string
-{
-    foreach (['text', 'photo', 'voice', 'audio', 'video', 'document', 'sticker', 'location'] as $type) {
-        if (array_key_exists($type, $message)) {
-            return $type;
+    $processed = $store->process($chatId, $updateId, static function (array &$state) use ($text, $callbackData, $message, $chatId, $updateId, $dataDirectory): void {
+        $catalog = new CatalogApi(setting('STORE_API_URL', 'https://mt23014.duckdns.org/index.php?rest_route=/wc/store/v1'), setting('STORE_RESOLVE_IP', '127.0.0.1'));
+        $openAi = new OpenAiApi(setting('OPENAI_API_KEY'), setting('OPENAI_MODEL'));
+        $conversation = new Conversation($catalog->products(...), $openAi->answer(...), setting('SUPPORT_URL', 'https://mt23014.duckdns.org/'));
+        logEvent($dataDirectory . '/logs', 'Entrada recibida', ['actualizacion' => $updateId,
+            'tipo' => $callbackData !== null ? 'boton' : (isset($message['text']) ? 'texto' : 'multimedia'), 'estado' => $state['step'] ?? 'menu']);
+        $lastSentAt = $state['_sent_at'] ?? 0;
+        $reply = $conversation->handle($text, $callbackData, isset($message['text']) || $callbackData !== null, $state);
+        if (isset($state['last_error'])) {
+            logEvent($dataDirectory . '/logs', 'Fallo de servicio', $state['last_error']);
+            unset($state['last_error']);
         }
+        $delay = 1.1 - (microtime(true) - $lastSentAt);
+        if ($delay > 0) {
+            usleep((int) ($delay * 1000000));
+        }
+        telegramRequest('sendMessage', ['chat_id' => $chatId, 'text' => mb_substr($reply['text'], 0, 4000), 'reply_markup' => $reply['reply_markup']]);
+        $state['_sent_at'] = microtime(true);
+        logEvent($dataDirectory . '/logs', 'Salida enviada', ['actualizacion' => $updateId, 'estado' => $state['step'] ?? 'menu', 'caracteres' => mb_strlen($reply['text'])]);
+    });
+    if (!$processed) {
+        logEvent($dataDirectory . '/logs', 'Actualización duplicada omitida', ['actualizacion' => $updateId]);
     }
-
-    return 'otro';
-}
-
-function logEvent(string $event, array $details = []): void
-{
-    $encodedDetails = json_encode(
-        $details,
-        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
-    );
-    $suffix = $encodedDetails !== false && $details !== []
-        ? " {$encodedDetails}"
-        : '';
-
-    fwrite(STDOUT, sprintf("[%s] %s%s\n", date('Y-m-d H:i:s'), $event, $suffix));
-}
-
-function sendWelcome(string $token, int|string $chatId): void
-{
-    $message = implode("\n", [
-        '¡Hola! Bienvenido a Tienda Electrónica.',
-        '',
-        'Aquí encontrarás información sobre los cuatro productos de la tienda, sus categorías y precios.',
-    ]);
-
-    telegramRequest($token, 'sendMessage', [
-        'chat_id' => $chatId,
-        'text' => $message,
-    ]);
+    $store->cleanup();
 }
 
 try {
-    loadEnvironment(dirname(__DIR__) . '/.env');
-    $token = getenv('BOT_TOKEN');
+    loadEnvironment(setting('BOT_ENV_FILE', dirname(__DIR__) . '/.env'));
+    $dataDirectory = setting('BOT_DATA_DIR', dirname(__DIR__) . '/var');
+    $store = new ChatStore($dataDirectory);
 
-    if ($token === false || trim($token) === '') {
-        throw new RuntimeException('La variable BOT_TOKEN no tiene un valor.');
-    }
-
-    $bot = telegramRequest($token, 'getMe');
-    $username = $bot['username'] ?? 'sin_usuario';
-    logEvent('Bot conectado', ['usuario' => "@{$username}"]);
-    logEvent('Esperando mensajes. Presiona Ctrl+C para detenerlo.');
-} catch (RuntimeException $exception) {
-    fwrite(STDERR, $exception->getMessage() . PHP_EOL);
-    exit(1);
-}
-
-$offset = 0;
-
-while (true) {
-    try {
-        $updates = telegramRequest($token, 'getUpdates', [
-            'offset' => $offset,
-            'timeout' => POLLING_TIMEOUT_SECONDS,
-            'allowed_updates' => json_encode(['message'], JSON_THROW_ON_ERROR),
-        ]);
-
-        foreach ($updates as $update) {
-            $offset = ((int) $update['update_id']) + 1;
-            $message = $update['message'] ?? null;
-
-            if (!is_array($message) || !isset($message['chat']['id'])) {
-                continue;
+    if (PHP_SAPI === 'cli') {
+        $mode = $argv[1] ?? '--help';
+        if ($mode === '--check') {
+            foreach (['BOT_TOKEN', 'OPENAI_API_KEY', 'OPENAI_MODEL'] as $name) {
+                requiredSetting($name);
+                echo "{$name}: configurado\n";
             }
-
-            $text = (string) ($message['text'] ?? '');
-            $messageType = detectMessageType($message);
-            $logDetails = [
-                'actualizacion' => (int) $update['update_id'],
-                'tipo' => $messageType,
-            ];
-
-            if ($messageType === 'text') {
-                $logDetails['texto'] = compactLogText($text);
+            $catalog = new CatalogApi(setting('STORE_API_URL', 'https://mt23014.duckdns.org/index.php?rest_route=/wc/store/v1'), setting('STORE_RESOLVE_IP', '127.0.0.1'));
+            echo 'WooCommerce: ' . count($catalog->products()) . " productos\n";
+            $bot = telegramRequest('getMe');
+            echo 'Telegram: @' . ($bot['username'] ?? 'sin_usuario') . "\n";
+            exit(0);
+        }
+        if ($mode === '--check-ai') {
+            $ai = new OpenAiApi(requiredSetting('OPENAI_API_KEY'), requiredSetting('OPENAI_MODEL'));
+            $catalog = new CatalogApi(setting('STORE_API_URL', 'https://mt23014.duckdns.org/index.php?rest_route=/wc/store/v1'), setting('STORE_RESOLVE_IP', '127.0.0.1'));
+            $answer = $ai->answer('Compara brevemente los productos del catálogo según su categoría, sin inventar especificaciones.', $catalog->products());
+            if (trim($answer) === 'FUERA_DE_ALCANCE') {
+                throw new RuntimeException('OpenAI no reconoció la consulta de prueba sobre el catálogo.');
             }
-
-            logEvent('Mensaje recibido', $logDetails);
-
-            if (isStartCommand($text)) {
-                sendWelcome($token, $message['chat']['id']);
-                logEvent('Respuesta enviada', [
-                    'actualizacion' => (int) $update['update_id'],
-                    'accion' => 'bienvenida',
-                ]);
-            } else {
-                logEvent('Mensaje sin respuesta', [
-                    'actualizacion' => (int) $update['update_id'],
-                    'motivo' => 'Solo /start está implementado',
-                ]);
+            echo "OpenAI: respuesta recibida usando el catálogo público\n";
+            exit(0);
+        }
+        if ($mode === '--register-webhook') {
+            $url = requiredSetting('WEBHOOK_URL');
+            $secret = requiredSetting('WEBHOOK_SECRET');
+            if (parse_url($url, PHP_URL_SCHEME) !== 'https' || !preg_match('/^[A-Za-z0-9_-]{1,256}$/', $secret)) {
+                throw new RuntimeException('WEBHOOK_URL o WEBHOOK_SECRET no son válidos.');
+            }
+            telegramRequest('setWebhook', ['url' => $url, 'secret_token' => $secret, 'allowed_updates' => ['message', 'callback_query']]);
+            echo "Webhook registrado.\n";
+            exit(0);
+        }
+        if ($mode === '--webhook-info') {
+            $info = telegramRequest('getWebhookInfo');
+            echo json_encode(array_intersect_key($info, array_flip(['url', 'pending_update_count', 'last_error_date', 'last_error_message'])), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
+            exit(0);
+        }
+        if ($mode === '--cleanup') {
+            $store->cleanup();
+            echo "Limpieza completada.\n";
+            exit(0);
+        }
+        if ($mode !== '--poll') {
+            echo "Uso: php src/bot.php --poll | --check | --check-ai | --register-webhook | --webhook-info | --cleanup\n";
+            exit($mode === '--help' ? 0 : 1);
+        }
+        $info = telegramRequest('getWebhookInfo');
+        if (($info['url'] ?? '') !== '') {
+            throw new RuntimeException('Ya hay un webhook registrado. No se iniciará polling.');
+        }
+        $pollLock = fopen($dataDirectory . '/poll.lock', 'c+');
+        if ($pollLock === false || !flock($pollLock, LOCK_EX | LOCK_NB)) {
+            throw new RuntimeException('Ya existe un proceso de polling activo.');
+        }
+        $offsetPath = $dataDirectory . '/offset';
+        $offset = is_file($offsetPath) ? (int) file_get_contents($offsetPath) : 0;
+        echo "Bot en marcha por long polling. Ctrl+C para detener.\n";
+        while (true) {
+            try {
+                $updates = telegramRequest('getUpdates', ['offset' => $offset, 'timeout' => 25, 'allowed_updates' => ['message', 'callback_query']]);
+                foreach ($updates as $update) {
+                    handleUpdate($update, $store, $dataDirectory);
+                    $offset = (int) $update['update_id'] + 1;
+                    file_put_contents($offsetPath, (string) $offset, LOCK_EX);
+                }
+            } catch (ServiceFailure $failure) {
+                logEvent($dataDirectory . '/logs', 'Fallo de polling', ['servicio' => $failure->service, 'http' => $failure->status]);
+                sleep(3);
             }
         }
-    } catch (RuntimeException | JsonException $exception) {
-        fwrite(
-            STDERR,
-            sprintf(
-                "[%s] %s Reintentando en 3 segundos.\n",
-                date('Y-m-d H:i:s'),
-                $exception->getMessage()
-            )
-        );
-        sleep(3);
+    }
+
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+        http_response_code(405);
+        header('Allow: POST');
+        exit;
+    }
+    $secret = requiredSetting('WEBHOOK_SECRET');
+    if (!hash_equals($secret, (string) ($_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? ''))) {
+        http_response_code(403);
+        exit;
+    }
+    $raw = file_get_contents('php://input', false, null, 0, 1048577);
+    if ($raw === false || strlen($raw) > 1048576) {
+        http_response_code(413);
+        exit;
+    }
+    try {
+        $update = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+    } catch (JsonException) {
+        http_response_code(400);
+        exit;
+    }
+    if (!is_array($update) || !isset($update['update_id'])) {
+        http_response_code(400);
+        exit;
+    }
+    // PHP-FPM confirma la recepción antes de esperar la respuesta de OpenAI.
+    http_response_code(200);
+    header('Content-Type: application/json');
+    echo '{"ok":true}';
+    if (function_exists('fastcgi_finish_request')) {
+        fastcgi_finish_request();
+    }
+    handleUpdate($update, $store, $dataDirectory);
+} catch (Throwable $failure) {
+    $message = $failure instanceof RuntimeException ? $failure->getMessage() : 'No fue posible iniciar o procesar el bot. Revisa configuración y permisos.';
+    if (PHP_SAPI === 'cli') {
+        fwrite(STDERR, $message . PHP_EOL);
+        exit(1);
+    }
+    error_log($message);
+    if (!headers_sent()) {
+        http_response_code(500);
     }
 }
