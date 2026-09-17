@@ -4,6 +4,7 @@ $env = parse_ini_file('/home/sp21013/chatbot/.env');
 $token = $env['BOT_TOKEN'];
 $wc_key = $env['WC_KEY'];
 $wc_secret = $env['WC_SECRET'];
+$groq_key = $env['GROQ_API_KEY'];
 $apiURL = "https://api.telegram.org/bot$token/";
 
 // Registro de los
@@ -14,6 +15,12 @@ function registrarLog($mensaje) {
 // Se captura el mensaje entrante
 $update = json_decode(file_get_contents("php://input"), true);
 if (!isset($update["message"])) exit;
+
+// Liberamos a Telegram inmediatamente dándole un 200 OK en segundo plano.
+// Esto evita que Telegram se desespere y que Nginx asesine nuestro script.
+if (function_exists('fastcgi_finish_request')) {
+    fastcgi_finish_request();
+}
 
 $chat_id = $update["message"]["chat"]["id"];
 $texto = trim($update["message"]["text"]);
@@ -62,7 +69,7 @@ else {
             $respuesta = "¡Gracias por preferir Postres SP21013! Adiós 😊👋🏻.";
         }
         else {
-            $respuesta = "Lo siento, no reconocí esa opción ☹️. Usa /ayuda para ver qué puedo hacer.";
+            $respuesta = consultarIA($texto);
         }
     }
     elseif ($sesion['estado'] === 'esperando_pedido') {
@@ -84,20 +91,42 @@ else {
 // Guardar estado y enviar mensaje
 file_put_contents($archivoSesion, json_encode($sesion));
 registrarLog("SALIDA [$chat_id]: $respuesta");
-file_get_contents($apiURL . "sendMessage?chat_id=$chat_id&text=" . urlencode($respuesta));
+
+// Enviar mensaje a Telegram (Formato JSON Estricto)
+$respuesta = trim($respuesta);
+
+// Un pequeño salvavidas por si la IA se queda sin palabras
+if (empty($respuesta)) {
+    $respuesta = "Lo siento, mi cerebro artificial se quedó en blanco. 😅 ¿Me lo repites?";
+}
+
+$ch_tg = curl_init($apiURL . "sendMessage");
+$payload_tg = json_encode([
+    'chat_id' => $chat_id,
+    'text' => $respuesta
+], JSON_UNESCAPED_UNICODE);
+
+curl_setopt($ch_tg, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch_tg, CURLOPT_POST, true);
+curl_setopt($ch_tg, CURLOPT_POSTFIELDS, $payload_tg);
+curl_setopt($ch_tg, CURLOPT_HTTPHEADER, [
+    'Content-Type: application/json',
+    'Content-Length: ' . strlen($payload_tg)
+]);
+curl_exec($ch_tg);
+curl_close($ch_tg);
 
 // Función para consumir la API de WooCommerce
 function consultarAPI($numero) {
     global $wc_key, $wc_secret;
 
-    // Ruta de la API de WooCommerce para consultar un pedido específico
     $url = "https://sp21013.duckdns.org/wp-json/wc/v3/orders/$numero";
 
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 5);
-    // Autenticacion requerida por WooCommerce
-    curl_setopt($ch, CURLOPT_USERPWD, $wc_key . ":" . $wc_secret);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15); // Tiempo aumentado
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // Ignorar validación estricta SSL local
+    curl_setopt($ch, CURLOPT_USERPWD, trim($wc_key) . ":" . trim($wc_secret));
 
     $resultado = curl_exec($ch);
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -106,11 +135,9 @@ function consultarAPI($numero) {
     if ($http_code == 200 && $resultado) {
         $datos = json_decode($resultado, true);
 
-        // Extraemos datos del JSON de WooCommerce
         $estado = $datos['status'];
         $total = $datos['total'];
 
-	// Extraemos todos los productos de la orden con sus cantidades
         if (!empty($datos['line_items'])) {
             $lista_productos = [];
             foreach ($datos['line_items'] as $item) {
@@ -121,7 +148,6 @@ function consultarAPI($numero) {
             $producto = "tu orden";
         }
 
-        // Diccionario para traducir los estados de WooCommerce al español
         $estados_es = [
             'pending' => 'pendiente de pago',
             'processing' => 'en preparación',
@@ -132,11 +158,58 @@ function consultarAPI($numero) {
         $estado_traducido = $estados_es[$estado] ?? $estado;
 
         return "¡Genial! 😄 Tu pedido $numero ($producto) se encuentra *$estado_traducido*. Su total es de $$total. ¿Deseas hacer otra consulta? 😊";
-
     } elseif ($http_code == 404) {
         return "Lo siento ☹️, no encontré ningún pedido con el número $numero en la tienda. Revisa tu correo de confirmación e intenta de nuevo.";
     } else {
         return "Tengo problemas técnicos para conectar con el sistema central (Error $http_code). ¿Deseas reintentar o hablar con un agente?";
     }
 }
+
+// Función para consumir el LLM vía API (Groq)
+function consultarIA($prompt) {
+    global $groq_key;
+
+    $url = "https://api.groq.com/openai/v1/chat/completions";
+
+    $payload = [
+        "model" => "openai/gpt-oss-20b",
+        "messages" => [
+            [
+                "role" => "system",
+                "content" => "Eres el asistente virtual amable y servicial de la tienda Postres SP21013 en San Salvador. Responde en español, de forma muy breve (máximo 2 oraciones), con calidez y emojis acordes a una pastelería. Si te preguntan por compras o pedidos, recuerda que pueden usar las opciones 'Menú' o 'Pedido'."
+            ],
+            [
+                "role" => "user",
+                "content" => $prompt
+            ]
+        ],
+        "temperature" => 0.6,
+        "max_tokens" => 250
+    ];
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15); // Tiempo aumentado
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // Bypass de SSL
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Content-Type: application/json',
+        'Authorization: Bearer ' . trim($groq_key)
+    ]);
+
+    $resultado = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($http_code == 200 && $resultado) {
+        $datos = json_decode($resultado, true);
+        return $datos['choices'][0]['message']['content'] ?? "¡Hola! ¿En qué puedo endulzar tu día hoy?";
+    } else {
+        $error_json = json_decode($resultado, true);
+        $motivo = $error_json['error']['message'] ?? "Error desconocido";
+        return "Detalle técnico Groq: Error $http_code - $motivo";
+    }
+}
 ?>
+
