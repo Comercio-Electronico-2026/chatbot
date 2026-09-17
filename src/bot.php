@@ -1,0 +1,215 @@
+<?php
+// Configuración inicial
+$env = parse_ini_file('/home/sp21013/chatbot/.env');
+$token = $env['BOT_TOKEN'];
+$wc_key = $env['WC_KEY'];
+$wc_secret = $env['WC_SECRET'];
+$groq_key = $env['GROQ_API_KEY'];
+$apiURL = "https://api.telegram.org/bot$token/";
+
+// Registro de los
+function registrarLog($mensaje) {
+    file_put_contents('/home/sp21013/chatbot/src/bot.log', date('Y-m-d H:i:s') . " - $mensaje\n", FILE_APPEND);
+}
+
+// Se captura el mensaje entrante
+$update = json_decode(file_get_contents("php://input"), true);
+if (!isset($update["message"])) exit;
+
+// Liberamos a Telegram inmediatamente dándole un 200 OK en segundo plano.
+// Esto evita que Telegram se desespere y que Nginx asesine nuestro script.
+if (function_exists('fastcgi_finish_request')) {
+    fastcgi_finish_request();
+}
+
+$chat_id = $update["message"]["chat"]["id"];
+$texto = trim($update["message"]["text"]);
+$textoLower = strtolower($texto);
+registrarLog("ENTRADA [$chat_id]: $texto");
+
+// Manejo de sesión, esto es para saber en qué parte del flujo está el usuario
+$archivoSesion = "/tmp/sesion_bot_$chat_id.json";
+$sesion = file_exists($archivoSesion) ? json_decode(file_get_contents($archivoSesion), true) : ['estado' => 'inicio', 'intentos' => 0];
+
+$respuesta = "";
+
+// Interceptor global (comandos, cancelación y ayuda)
+if (in_array($textoLower, ['/cancelar', '/ayuda', 'quiero hablar con alguien', 'hola', '/start'])) {
+    $sesion['estado'] = 'inicio';
+    $sesion['intentos'] = 0;
+
+    if ($textoLower === '/cancelar') {
+        $respuesta = "Se ha cancelado la operación y los datos de la sesión han sido borrados. ¿Deseas hacer otra consulta? 😊";
+    } elseif ($textoLower === '/ayuda') {
+        $respuesta = "📝 Instrucciones: Escribe 'Menú' para ver el catálogo, 'Pedido' para rastrear tu orden, o 'Quiero hablar con alguien' para soporte humano.";
+    } elseif ($textoLower === 'quiero hablar con alguien') {
+        $respuesta = "Transfiriendo a un agente humano... Por favor, espera un momento. Adiós 👋🏻.";
+    } else {
+        $respuesta = "¡Hola! 👋🏻 Soy el asistente virtual de Postres SP21013. Puedo mostrarte nuestro menú, consultar tu orden o comunicarte con un agente. Puedes escribir /ayuda o /cancelar en cualquier momento. ¿Qué necesitas?";
+    }
+}
+
+// Maquina de estados principal
+else {
+    if ($sesion['estado'] === 'inicio') {
+        if (strpos($textoLower, 'menú') !== false || strpos($textoLower, 'menu') !== false) {
+            $respuesta = "📋🍰 Aquí tienes nuestro catálogo: \n- Pastel de Chocolate ($25.00)\n- Pastel Tres Leches ($20.00)\n- Pastel de Limón ($20.00)\n- Caja de 6 Cupcakes ($9.00)\n- Porción de Cheesecake de Fresa ($4.50)\n¿Deseas hacer otra consulta?";
+        }
+        elseif (strpos($textoLower, 'pedido') !== false) {
+            // Slot Filling: Buscar si ya dio el número en el mensaje
+            preg_match('/\b\d{4}\b/', $texto, $coincidencias);
+            if (!empty($coincidencias)) {
+                $respuesta = consultarAPI($coincidencias[0]);
+            } else {
+                $sesion['estado'] = 'esperando_pedido';
+                $respuesta = "Claro. ¿Cuál es tu número de pedido de 4 dígitos? 🧐🔍";
+            }
+        }
+        elseif (in_array($textoLower, ['no', 'no gracias', 'no, gracias'])) {
+            $respuesta = "¡Gracias por preferir Postres SP21013! Adiós 😊👋🏻.";
+        }
+        else {
+            $respuesta = consultarIA($texto);
+        }
+    }
+    elseif ($sesion['estado'] === 'esperando_pedido') {
+        if (preg_match('/^\d{4}$/', $texto)) {
+            $respuesta = consultarAPI($texto);
+            $sesion['estado'] = 'inicio';
+        } else {
+            $sesion['intentos']++;
+            if ($sesion['intentos'] >= 3) {
+                $respuesta = "Límite de intentos superado. Transfiriendo a un agente humano...";
+                $sesion['estado'] = 'inicio';
+            } else {
+                $respuesta = "Error: El formato es incorrecto. Debe tener exactamente 4 dígitos. Intenta de nuevo (Intento {$sesion['intentos']}/3).";
+            }
+        }
+    }
+}
+
+// Guardar estado y enviar mensaje
+file_put_contents($archivoSesion, json_encode($sesion));
+registrarLog("SALIDA [$chat_id]: $respuesta");
+
+// Enviar mensaje a Telegram (Formato JSON Estricto)
+$respuesta = trim($respuesta);
+
+// Un pequeño salvavidas por si la IA se queda sin palabras
+if (empty($respuesta)) {
+    $respuesta = "Lo siento, mi cerebro artificial se quedó en blanco. 😅 ¿Me lo repites?";
+}
+
+$ch_tg = curl_init($apiURL . "sendMessage");
+$payload_tg = json_encode([
+    'chat_id' => $chat_id,
+    'text' => $respuesta
+], JSON_UNESCAPED_UNICODE);
+
+curl_setopt($ch_tg, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch_tg, CURLOPT_POST, true);
+curl_setopt($ch_tg, CURLOPT_POSTFIELDS, $payload_tg);
+curl_setopt($ch_tg, CURLOPT_HTTPHEADER, [
+    'Content-Type: application/json',
+    'Content-Length: ' . strlen($payload_tg)
+]);
+curl_exec($ch_tg);
+curl_close($ch_tg);
+
+// Función para consumir la API de WooCommerce
+function consultarAPI($numero) {
+    global $wc_key, $wc_secret;
+
+    $url = "https://sp21013.duckdns.org/wp-json/wc/v3/orders/$numero";
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15); // Tiempo aumentado
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // Ignorar validación estricta SSL local
+    curl_setopt($ch, CURLOPT_USERPWD, trim($wc_key) . ":" . trim($wc_secret));
+
+    $resultado = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($http_code == 200 && $resultado) {
+        $datos = json_decode($resultado, true);
+
+        $estado = $datos['status'];
+        $total = $datos['total'];
+
+        if (!empty($datos['line_items'])) {
+            $lista_productos = [];
+            foreach ($datos['line_items'] as $item) {
+                $lista_productos[] = $item['quantity'] . "x " . $item['name'];
+            }
+            $producto = implode(", ", $lista_productos);
+        } else {
+            $producto = "tu orden";
+        }
+
+        $estados_es = [
+            'pending' => 'pendiente de pago',
+            'processing' => 'en preparación',
+            'on-hold' => 'en espera',
+            'completed' => 'completado y entregado',
+            'cancelled' => 'cancelado'
+        ];
+        $estado_traducido = $estados_es[$estado] ?? $estado;
+
+        return "¡Genial! 😄 Tu pedido $numero ($producto) se encuentra *$estado_traducido*. Su total es de $$total. ¿Deseas hacer otra consulta? 😊";
+    } elseif ($http_code == 404) {
+        return "Lo siento ☹️, no encontré ningún pedido con el número $numero en la tienda. Revisa tu correo de confirmación e intenta de nuevo.";
+    } else {
+        return "Tengo problemas técnicos para conectar con el sistema central (Error $http_code). ¿Deseas reintentar o hablar con un agente?";
+    }
+}
+
+// Función para consumir el LLM vía API (Groq)
+function consultarIA($prompt) {
+    global $groq_key;
+
+    $url = "https://api.groq.com/openai/v1/chat/completions";
+
+    $payload = [
+        "model" => "openai/gpt-oss-20b",
+        "messages" => [
+            [
+                "role" => "system",
+                "content" => "Eres el asistente virtual amable y servicial de la tienda Postres SP21013 en San Salvador. Responde en español, de forma muy breve (máximo 2 oraciones), con calidez y emojis acordes a una pastelería. Si te preguntan por compras o pedidos, recuerda que pueden usar las opciones 'Menú' o 'Pedido'."
+            ],
+            [
+                "role" => "user",
+                "content" => $prompt
+            ]
+        ],
+        "temperature" => 0.6,
+        "max_tokens" => 250
+    ];
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15); // Tiempo aumentado
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // Bypass de SSL
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Content-Type: application/json',
+        'Authorization: Bearer ' . trim($groq_key)
+    ]);
+
+    $resultado = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($http_code == 200 && $resultado) {
+        $datos = json_decode($resultado, true);
+        return $datos['choices'][0]['message']['content'] ?? "¡Hola! ¿En qué puedo endulzar tu día hoy?";
+    } else {
+        $error_json = json_decode($resultado, true);
+        $motivo = $error_json['error']['message'] ?? "Error desconocido";
+        return "Detalle técnico Groq: Error $http_code - $motivo";
+    }
+}
+?>
+
